@@ -16,11 +16,11 @@
       min-height: 100vh;
     }
     .box {
-      max-width: 400px;
+      max-width: 420px;
       width: 100%;
-      padding: 20px;
+      padding: 24px;
       background: #111;
-      border-radius: 16px;
+      border-radius: 18px;
       text-align: center;
     }
     button {
@@ -28,7 +28,7 @@
       padding: 14px;
       margin-top: 12px;
       border: none;
-      border-radius: 12px;
+      border-radius: 14px;
       font-size: 16px;
       cursor: pointer;
     }
@@ -56,14 +56,13 @@
   }
 
   function musician() {
-    const song = localStorage.getItem("song");
     document.getElementById("app").innerHTML = `
       <h2>Músico</h2>
-      <p id="song">${song || "Esperando alabanza..."}</p>
+      <p id="song">Esperando alabanza…</p>
     `;
     setInterval(() => {
       document.getElementById("song").innerText =
-        localStorage.getItem("song") || "Esperando alabanza...";
+        localStorage.getItem("song") || "Esperando alabanza…";
     }, 500);
   }
 
