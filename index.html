@@ -75,26 +75,41 @@
   function leader() {
     document.getElementById("app").innerHTML = `
       <h2>Líder</h2>
-      <p>Enviar alabanza</p>
-      <button onclick="send('Santo es el Señor')">Santo es el Señor</button>
-      <button onclick="send('Cuán Grande es Él')">Cuán Grande es Él</button>
+
+      <input id="title" placeholder="Título de la alabanza"
+        style="width:100%;padding:10px;border-radius:10px;margin-bottom:10px">
+
+      <textarea id="content" rows="10"
+        placeholder="Letra completa + acordes"
+        style="width:100%;padding:10px;border-radius:10px"></textarea>
+
+      <button class="leader" onclick="sendSong()">Enviar alabanza</button>
     `;
   }
 
   function musician() {
     document.getElementById("app").innerHTML = `
-      <h2>Músico</h2>
-      <div class="song" id="song">Esperando alabanza…</div>
+      <h2 id="songTitle">Esperando…</h2>
+      <pre class="song" id="songContent">Esperando alabanza…</pre>
     `;
 
     database.ref("song").on("value", (snapshot) => {
-      document.getElementById("song").innerText =
-        snapshot.val() || "Esperando alabanza…";
+      const data = snapshot.val();
+      if (!data) return;
+
+      document.getElementById("songTitle").innerText = data.title;
+      document.getElementById("songContent").innerText = data.content;
     });
   }
 
-  function send(song) {
-    database.ref("song").set(song);
+  function sendSong() {
+    const title = document.getElementById("title").value;
+    const content = document.getElementById("content").value;
+
+    database.ref("song").set({
+      title,
+      content
+    });
   }
 </script>
 
