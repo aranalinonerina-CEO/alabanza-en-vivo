@@ -76,15 +76,44 @@
     document.getElementById("app").innerHTML = `
       <h2>Líder</h2>
 
-      <input id="title" placeholder="Título de la alabanza"
-        style="width:100%;padding:10px;border-radius:10px;margin-bottom:10px">
+      <input id="search" placeholder="Buscar alabanza"
+        style="width:100%;padding:10px;border-radius:10px;margin-bottom:10px"
+        oninput="loadSongs()">
 
-      <textarea id="content" rows="10"
-        placeholder="Letra completa + acordes"
-        style="width:100%;padding:10px;border-radius:10px"></textarea>
-
-      <button class="leader" onclick="sendSong()">Enviar alabanza</button>
+      <div id="songList">Cargando...</div>
     `;
+
+    loadSongs();
+  }
+
+  function loadSongs() {
+    const search = document.getElementById("search")?.value?.toLowerCase() || "";
+
+    database.ref("songs").once("value", snapshot => {
+      const songs = snapshot.val() || {};
+      let html = "";
+
+      Object.keys(songs).forEach(id => {
+        const song = songs[id];
+        if (!song.title.toLowerCase().includes(search)) return;
+
+        html += `
+          <div style="margin-bottom:10px;padding:10px;background:#222;border-radius:10px">
+            <strong>${song.title}</strong>
+            <button class="leader" onclick="sendSong('${id}')">Enviar</button>
+          </div>
+        `;
+      });
+
+      document.getElementById("songList").innerHTML =
+        html || "<p>No hay resultados</p>";
+    });
+  }
+
+  function sendSong(id) {
+    database.ref("songs/" + id).once("value", snapshot => {
+      database.ref("currentSong").set(snapshot.val());
+    });
   }
 
   function musician() {
@@ -93,22 +122,12 @@
       <pre class="song" id="songContent">Esperando alabanza…</pre>
     `;
 
-    database.ref("song").on("value", (snapshot) => {
+    database.ref("currentSong").on("value", snapshot => {
       const data = snapshot.val();
       if (!data) return;
 
       document.getElementById("songTitle").innerText = data.title;
       document.getElementById("songContent").innerText = data.content;
-    });
-  }
-
-  function sendSong() {
-    const title = document.getElementById("title").value;
-    const content = document.getElementById("content").value;
-
-    database.ref("song").set({
-      title,
-      content
     });
   }
 </script>
