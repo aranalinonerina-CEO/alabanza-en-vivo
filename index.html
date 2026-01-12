@@ -1,9 +1,29 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
+  <head>
   <meta charset="UTF-8">
   <title>Alabanza en vivo</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 🔥 FIREBASE -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyAXKadX2tmURGRO3oZJ2iNJVpUoqzD5jSk",
+    authDomain: "alabanza-en-vivo.firebaseapp.com",
+    databaseURL: "https://alabanza-en-vivo-default-rtdb.firebaseio.com",
+    projectId: "alabanza-en-vivo",
+    storageBucket: "alabanza-en-vivo.appspot.com",
+    messagingSenderId: "374349060844",
+    appId: "1:374349060844:web:67860d311a8ced5db7e3c9"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+</script>
+
   <style>
     body {
       margin: 0;
@@ -41,6 +61,7 @@
     }
   </style>
 </head>
+
 <body>
 
 <div class="box" id="app">
@@ -65,14 +86,15 @@
       <h2>Músico</h2>
       <div class="song" id="song">Esperando alabanza…</div>
     `;
-    setInterval(() => {
+
+    database.ref("song").on("value", (snapshot) => {
       document.getElementById("song").innerText =
-        localStorage.getItem("song") || "Esperando alabanza…";
-    }, 500);
+        snapshot.val() || "Esperando alabanza…";
+    });
   }
 
   function send(song) {
-    localStorage.setItem("song", song);
+    database.ref("song").set(song);
   }
 </script>
 
