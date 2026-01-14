@@ -23,7 +23,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let leaderCode = null;
+let leaderCode = localStorage.getItem("leaderCode");
+let currentSongId = null;
 </script>
 
 <style>
@@ -45,164 +46,187 @@ body {
   max-width: 420px;
   text-align: center;
 }
-button, input, textarea {
+button {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
   margin-top: 10px;
-  border-radius: 12px;
   border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  cursor: pointer;
 }
-button { cursor: pointer; }
 .leader { background: #22c55e; color: #000; }
 .musician { background: #3b82f6; color: #fff; }
-.song { white-space: pre-wrap; margin-top: 12px; background:#222; padding:12px; border-radius:12px; }
+.song { white-space: pre-wrap; margin-top: 16px; text-align:left; }
+.card {
+  background:#222;
+  padding:10px;
+  border-radius:10px;
+  margin-top:8px;
+}
 </style>
 </head>
 
 <body>
-<div class="box" id="app"></div>
+
+<div class="box" id="app">
+  <h1>🎶 Alabanza en vivo</h1>
+  <button class="leader" onclick="leader()">Soy Líder</button>
+  <button class="musician" onclick="musician()">Soy Músico</button>
+</div>
 
 <script>
-start();
+/* ---------- LÍDER ---------- */
 
-function start() {
-  document.getElementById("app").innerHTML = `
-    <h1>🎶 Alabanza en vivo</h1>
-    <button class="leader" onclick="leaderRegister()">Soy Líder</button>
-    <button class="musician" onclick="musicianLogin()">Soy Músico</button>
-  `;
-}
-
-/* ===== LÍDER ===== */
-
-function leaderRegister() {
-  document.getElementById("app").innerHTML = `
-    <h2>Crear cuenta líder</h2>
-    <input id="lname" placeholder="Nombre del líder">
-    <button class="leader" onclick="createLeader()">Crear cuenta</button>
-    <button onclick="start()">Volver</button>
-  `;
+function leader() {
+  if (leaderCode) {
+    openLeaderPanel();
+  } else {
+    createLeader();
+  }
 }
 
 function createLeader() {
-  const name = document.getElementById("lname").value;
-  if (!name) return alert("Ingresá un nombre");
-
-  leaderCode = "L" + Math.random().toString(36).substring(2,8).toUpperCase();
+  leaderCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  localStorage.setItem("leaderCode", leaderCode);
 
   db.ref("leaders/" + leaderCode).set({
-    name,
     created: Date.now()
   });
 
-  leaderPanel();
+  alert("Tu código de líder es: " + leaderCode);
+  openLeaderPanel();
 }
 
-function leaderPanel() {
+function openLeaderPanel() {
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
-    <p><b>Código:</b> ${leaderCode}</p>
+    <p>Código: <b>${leaderCode}</b></p>
+
     <button class="leader" onclick="newSong()">➕ Nueva alabanza</button>
-    <input id="search" placeholder="Buscar" oninput="loadSongs()">
     <div id="list"></div>
+    <button onclick="logout()">Cerrar sesión</button>
   `;
   loadSongs();
 }
 
 function newSong() {
+  currentSongId = null;
   document.getElementById("app").innerHTML = `
     <h2>Nueva alabanza</h2>
-    <input id="title" placeholder="Título">
-    <textarea id="content" rows="8" placeholder="Letra + acordes"></textarea>
+    <input id="title" placeholder="Título" style="width:100%;padding:10px"><br><br>
+    <textarea id="content" rows="10" placeholder="Letra + acordes"
+      style="width:100%;padding:10px"></textarea>
     <button class="leader" onclick="saveSong()">Guardar</button>
-    <button onclick="leaderPanel()">Volver</button>
+    <button onclick="openLeaderPanel()">Volver</button>
   `;
 }
 
 function saveSong() {
   const title = document.getElementById("title").value;
   const content = document.getElementById("content").value;
+  if (!title || !content) return alert("Completá todo");
 
-  if (!title || !content) {
-    alert("Completá todo");
-    return;
-  }
+  const ref = currentSongId
+    ? db.ref(`songs/${leaderCode}/${currentSongId}`)
+    : db.ref(`songs/${leaderCode}`).push();
 
-  db.ref("songs/" + leaderCode).push({
-    title: title,
-    content: content,
-    created: Date.now()
-  });
-
-  leaderPanel();
+  ref.set({ title, content });
+  openLeaderPanel();
 }
 
 function loadSongs() {
   const list = document.getElementById("list");
-  if (!list) return;
-  const q = document.getElementById("search").value.toLowerCase();
-
-  db.ref("songs/" + leaderCode).on("value", snap => {
+  db.ref(`songs/${leaderCode}`).on("value", snap => {
     list.innerHTML = "";
-    snap.forEach(c => {
-      const s = c.val();
-      if (!s.title.toLowerCase().includes(q)) return;
+    if (!snap.exists()) {
+      list.innerHTML = "<p>No hay alabanzas</p>";
+      return;
+    }
+
+    snap.forEach(child => {
+      const s = child.val();
+      const id = child.key;
 
       const d = document.createElement("div");
-      d.className = "song";
+      d.className = "card";
       d.innerHTML = `
-        <b>${s.title}</b><br><br>
-        <button onclick="sendSong('${c.key}')">Enviar</button>
-        <button onclick="deleteSong('${c.key}')">Eliminar</button>
+        <b>${s.title}</b><br>
+        <button onclick="sendSong('${id}')">📤 Enviar</button>
+        <button onclick="editSong('${id}')">✏️ Editar</button>
+        <button onclick="deleteSong('${id}')">🗑️ Eliminar</button>
       `;
       list.appendChild(d);
     });
   });
 }
 
-function sendSong(id) {
-  db.ref("songs/" + leaderCode + "/" + id).once("value")
-    .then(s => db.ref("live/" + leaderCode).set(s.val()));
+function editSong(id) {
+  db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
+    const s = snap.val();
+    currentSongId = id;
+    document.getElementById("app").innerHTML = `
+      <h2>Editando</h2>
+      <input id="title" value="${s.title}" style="width:100%;padding:10px"><br><br>
+      <textarea id="content" rows="10"
+        style="width:100%;padding:10px">${s.content}</textarea>
+      <button class="leader" onclick="saveSong()">Guardar cambios</button>
+      <button onclick="openLeaderPanel()">Volver</button>
+    `;
+  });
 }
 
 function deleteSong(id) {
-  if (confirm("Eliminar alabanza?")) {
-    db.ref("songs/" + leaderCode + "/" + id).remove();
-  }
+  if (!confirm("¿Eliminar alabanza?")) return;
+  db.ref(`songs/${leaderCode}/${id}`).remove();
 }
 
-/* ===== MÚSICO ===== */
-
-function musicianLogin() {
-  document.getElementById("app").innerHTML = `
-    <h2>Ingresar código</h2>
-    <input id="code" placeholder="Código del líder">
-    <button class="musician" onclick="enterAsMusician()">Entrar</button>
-    <button onclick="start()">Volver</button>
-  `;
-}
-
-function enterAsMusician() {
-  const code = document.getElementById("code").value.toUpperCase();
-  db.ref("leaders/" + code).once("value").then(snap => {
-    if (!snap.exists()) return alert("Código inválido");
-    leaderCode = code;
-    musicianPanel();
+function sendSong(id) {
+  db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
+    db.ref(`live/${leaderCode}`).set(snap.val());
+    alert("Enviada a músicos");
   });
 }
 
-function musicianPanel() {
+function logout() {
+  localStorage.removeItem("leaderCode");
+  location.reload();
+}
+
+/* ---------- MÚSICO ---------- */
+
+function musician() {
   document.getElementById("app").innerHTML = `
-    <h2 id="t">Esperando alabanza…</h2>
-    <div id="c" class="song"></div>
+    <h2>Músico</h2>
+    <input id="code" placeholder="Código del líder"
+      style="width:100%;padding:10px"><br><br>
+    <button class="musician" onclick="enterMusician()">Entrar</button>
+  `;
+}
+
+function enterMusician() {
+  const code = document.getElementById("code").value.toUpperCase();
+  if (!code) return;
+
+  db.ref("leaders/" + code).once("value").then(snap => {
+    if (!snap.exists()) return alert("Código inválido");
+    listenLive(code);
+  });
+}
+
+function listenLive(code) {
+  document.getElementById("app").innerHTML = `
+    <h2 id="t">Esperando…</h2>
+    <div class="song" id="c">---</div>
   `;
 
-  db.ref("live/" + leaderCode).on("value", snap => {
+  db.ref(`live/${code}`).on("value", snap => {
     if (!snap.exists()) return;
-    t.innerText = snap.val().title;
-    c.innerText = snap.val().content;
+    document.getElementById("t").innerText = snap.val().title;
+    document.getElementById("c").innerText = snap.val().content;
   });
 }
 </script>
+
 </body>
 </html>
