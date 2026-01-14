@@ -137,8 +137,9 @@
         return;
       }
 
-      snapshot.forEach((child) => {
-        const song = child.val();
+    snapshot.forEach((child) => {
+  const song = child.val();
+  const songId = child.key;
 
         if (!song.title.toLowerCase().includes(search)) return;
 
@@ -149,12 +150,16 @@
         div.style.borderRadius = "10px";
         div.style.cursor = "pointer";
 
-        div.innerHTML = `<strong>${song.title}</strong>`;
-
-        div.onclick = () => {
-          database.ref("song").set(song);
-          alert("Alabanza enviada a músicos");
-        };
+       div.innerHTML = `
+  <strong>${song.title}</strong><br>
+  <button style="margin-top:6px" onclick="sendSong('${songId}')">
+    📤 Enviar
+  </button>
+  <button style="margin-top:6px;background:#ef4444;color:#fff"
+    onclick="deleteSong('${songId}')">
+    🗑️ Eliminar
+  </button>
+`;
 
         list.appendChild(div);
       });
@@ -175,6 +180,19 @@
       document.getElementById("songContent").innerText = data.content;
     });
   }
+  function sendSong(id) {
+  database.ref("songs/" + id).once("value").then((snapshot) => {
+    database.ref("song").set(snapshot.val());
+    alert("Alabanza enviada a músicos");
+  });
+}
+
+function deleteSong(id) {
+  if (!confirm("¿Seguro que querés eliminar esta alabanza?")) return;
+
+  database.ref("songs/" + id).remove();
+}
+
 </script>
 
 </body>
