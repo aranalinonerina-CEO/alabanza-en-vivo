@@ -120,11 +120,20 @@ function newSong() {
 }
 
 function saveSong() {
-  const title = title.value;
-  const content = content.value;
-  if (!title || !content) return alert("Completá todo");
+  const title = document.getElementById("title").value;
+  const content = document.getElementById("content").value;
 
-  db.ref("songs/" + leaderCode).push({ title, content });
+  if (!title || !content) {
+    alert("Completá todo");
+    return;
+  }
+
+  db.ref("songs/" + leaderCode).push({
+    title: title,
+    content: content,
+    created: Date.now()
+  });
+
   leaderPanel();
 }
 
