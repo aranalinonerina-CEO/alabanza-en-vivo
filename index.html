@@ -23,7 +23,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-let leaderCode = localStorage.getItem("leaderCode");
+let leaderCode = null;
 let currentSongId = null;
 </script>
 
@@ -79,22 +79,39 @@ button {
 /* ---------- LÍDER ---------- */
 
 function leader() {
-  if (leaderCode) {
+  document.getElementById("app").innerHTML = `
+    <h2>Líder</h2>
+    <button class="leader" onclick="showLoginLeader()">🔐 Entrar a mi cuenta</button>
+    <button onclick="createLeader()">🆕 Crear cuenta nueva</button>
+    <button onclick="location.reload()">⬅ Volver</button>
+  `;
+}
+
+function showLoginLeader() {
+  document.getElementById("app").innerHTML = `
+    <h2>Entrar</h2>
+    <input id="code" placeholder="Código de líder" style="width:100%;padding:10px"><br><br>
+    <button class="leader" onclick="loginLeader()">Entrar</button>
+    <button onclick="leader()">⬅ Volver</button>
+  `;
+}
+
+function loginLeader() {
+  const code = document.getElementById("code").value.toUpperCase();
+  if (!code) return alert("Ingresá el código");
+
+  db.ref("leaders/" + code).once("value").then(snap => {
+    if (!snap.exists()) return alert("Código inválido");
+    leaderCode = code;
     openLeaderPanel();
-  } else {
-    createLeader();
-  }
+  });
 }
 
 function createLeader() {
   leaderCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-  localStorage.setItem("leaderCode", leaderCode);
 
-  db.ref("leaders/" + leaderCode).set({
-    created: Date.now()
-  });
-
-  alert("Tu código de líder es: " + leaderCode);
+  db.ref("leaders/" + leaderCode).set({ created: Date.now() });
+  alert("Tu código es: " + leaderCode);
   openLeaderPanel();
 }
 
@@ -102,10 +119,9 @@ function openLeaderPanel() {
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
     <p>Código: <b>${leaderCode}</b></p>
-
     <button class="leader" onclick="newSong()">➕ Nueva alabanza</button>
     <div id="list"></div>
-    <button onclick="logout()">Cerrar sesión</button>
+    <button onclick="leader()">Cerrar sesión</button>
   `;
   loadSongs();
 }
@@ -143,20 +159,17 @@ function loadSongs() {
       list.innerHTML = "<p>No hay alabanzas</p>";
       return;
     }
-
     snap.forEach(child => {
       const s = child.val();
       const id = child.key;
-
-      const d = document.createElement("div");
-      d.className = "card";
-      d.innerHTML = `
-        <b>${s.title}</b><br>
-        <button onclick="sendSong('${id}')">📤 Enviar</button>
-        <button onclick="editSong('${id}')">✏️ Editar</button>
-        <button onclick="deleteSong('${id}')">🗑️ Eliminar</button>
+      list.innerHTML += `
+        <div class="card">
+          <b>${s.title}</b><br>
+          <button onclick="sendSong('${id}')">📤 Enviar</button>
+          <button onclick="editSong('${id}')">✏️ Editar</button>
+          <button onclick="deleteSong('${id}')">🗑️ Eliminar</button>
+        </div>
       `;
-      list.appendChild(d);
     });
   });
 }
@@ -170,27 +183,22 @@ function editSong(id) {
       <input id="title" value="${s.title}" style="width:100%;padding:10px"><br><br>
       <textarea id="content" rows="10"
         style="width:100%;padding:10px">${s.content}</textarea>
-      <button class="leader" onclick="saveSong()">Guardar cambios</button>
+      <button class="leader" onclick="saveSong()">Guardar</button>
       <button onclick="openLeaderPanel()">Volver</button>
     `;
   });
 }
 
 function deleteSong(id) {
-  if (!confirm("¿Eliminar alabanza?")) return;
-  db.ref(`songs/${leaderCode}/${id}`).remove();
+  if (confirm("¿Eliminar?"))
+    db.ref(`songs/${leaderCode}/${id}`).remove();
 }
 
 function sendSong(id) {
   db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
     db.ref(`live/${leaderCode}`).set(snap.val());
-    alert("Enviada a músicos");
+    alert("Enviada");
   });
-}
-
-function logout() {
-  localStorage.removeItem("leaderCode");
-  location.reload();
 }
 
 /* ---------- MÚSICO ---------- */
