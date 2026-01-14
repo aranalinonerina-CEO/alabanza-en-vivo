@@ -5,7 +5,6 @@
 <title>Alabanza en vivo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
@@ -24,174 +23,165 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const storage = firebase.storage();
-
-let room = null;
-let currentSongId = null;
+let user = null;
 </script>
 
 <style>
-body {
-  background:#000; color:#fff; font-family:system-ui;
-  display:flex; justify-content:center; align-items:center;
-  min-height:100vh; margin:0;
-}
-.box {
-  background:#111; padding:24px; border-radius:18px;
-  max-width:420px; width:100%;
-}
-button,input,textarea {
-  width:100%; padding:12px; margin-top:10px;
-  border-radius:10px; border:none;
-}
-.leader { background:#22c55e; color:#000 }
-.musician { background:#3b82f6; color:#fff }
-.delete { background:#ef4444; color:#fff }
-.item { background:#222; padding:10px; border-radius:10px; margin-top:8px }
-.song { white-space:pre-wrap; margin-top:12px }
-a { color:#60a5fa }
+body{background:#000;color:#fff;font-family:system-ui;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+.box{background:#111;padding:20px;border-radius:16px;width:100%;max-width:420px}
+input,textarea,button{width:100%;padding:10px;margin-top:8px;border-radius:10px;border:none}
+button{cursor:pointer}
+.primary{background:#22c55e;color:#000}
+.secondary{background:#3b82f6;color:#fff}
+.danger{background:#ef4444;color:#fff}
+.small{background:#333;color:#fff}
+.song{background:#222;padding:10px;border-radius:10px;margin-top:6px}
+pre{white-space:pre-wrap}
+
+/* 🎸 ACORDES */
+.chord{color:#22c55e;font-weight:bold}
 </style>
 </head>
 
 <body>
+<div class="box" id="app"></div>
 
-<div class="box" id="app">
-  <h2>🎶 Alabanza en vivo</h2>
-  <input id="name" placeholder="Tu nombre">
+<script>
+/* ---------- LOGIN SIMPLE ---------- */
+const saved = localStorage.getItem("user");
+saved ? (user=JSON.parse(saved), user.role==="leader"?leader():musician()) : login();
+
+function login(){
+  app().innerHTML=`
+  <h2>Entrar</h2>
+  <input id="u" placeholder="Usuario">
+  <input id="r" placeholder="Código líder">
+  <button class="primary" onclick="doLogin()">Entrar</button>
+  <button class="small" onclick="register()">Registrarse</button>`;
+}
+
+function doLogin(){
+  db.ref("users/"+val("u")).once("value").then(s=>{
+    if(!s.exists()) return alert("No existe");
+    if(s.val().room!==val("r")) return alert("Código incorrecto");
+    user=s.val();
+    localStorage.setItem("user",JSON.stringify(user));
+    user.role==="leader"?leader():musician();
+  });
+}
+
+/* ---------- REGISTRO ---------- */
+function register(){
+  app().innerHTML=`
+  <h2>Registro</h2>
+  <input id="u" placeholder="Usuario único">
   <select id="role">
     <option value="leader">Líder</option>
     <option value="musician">Músico</option>
+    <option value="editor">Editor</option>
   </select>
-  <input id="room" placeholder="Código del líder (ej: ABC123)">
-  <button onclick="enter()">Entrar</button>
-</div>
+  <input id="r" placeholder="Código líder">
+  <button class="secondary" onclick="doRegister()">Crear</button>
+  <button class="small" onclick="login()">Volver</button>`;
+}
 
-<script>
-function enter() {
-  const name = nameEl().value;
-  room = roomEl().value.toUpperCase();
-  const role = roleEl().value;
-
-  if (!name || !room) return alert("Completá todo");
-
-  db.ref("rooms/"+room+"/users").push({ name, role });
-
-  role === "leader" ? leader() : musician();
+function doRegister(){
+  const data={username:val("u"),role:val("role"),room:val("r")};
+  db.ref("users/"+data.username).once("value").then(s=>{
+    if(s.exists()) return alert("Usuario existe");
+    if(data.role==="leader") db.ref("rooms/"+data.room).set({owner:data.username});
+    db.ref("users/"+data.username).set(data);
+    localStorage.setItem("user",JSON.stringify(data));
+    user=data;
+    user.role==="leader"?leader():musician();
+  });
 }
 
 /* ---------- LÍDER ---------- */
-function leader() {
-  app().innerHTML = `
-    <h2>Líder – Sala ${room}</h2>
-    <button class="leader" onclick="add()">➕ Nueva alabanza</button>
-    <div id="list"></div>
-  `;
+function leader(){
+  app().innerHTML=`
+  <h2>Líder (${user.room})</h2>
+  <input id="search" placeholder="Buscar alabanza" oninput="loadSongs()">
+  <button class="primary" onclick="newSong()">➕ Nueva</button>
+  <button class="small" onclick="logout()">Salir</button>
+  <div id="list"></div>`;
   loadSongs();
 }
 
-function add() {
-  app().innerHTML = `
-    <h3>Nueva alabanza</h3>
-    <input id="title" placeholder="Título">
-    <textarea id="content" rows="6" placeholder="Letra + acordes"></textarea>
-    <input type="file" id="file">
-    <button class="leader" onclick="saveSong()">Guardar</button>
-    <button onclick="leader()">Volver</button>
-  `;
+function newSong(){
+  app().innerHTML=`
+  <h3>Nueva alabanza</h3>
+  <input id="t" placeholder="Título">
+  <textarea id="c" rows="6" placeholder="Letra + acordes [C]"></textarea>
+  <input type="file" id="file">
+  <button class="primary" onclick="saveSong()">Guardar</button>
+  <button class="small" onclick="leader()">Volver</button>`;
 }
 
-function saveSong() {
-  const title = titleEl().value;
-  const content = contentEl().value;
-  const file = document.getElementById("file").files[0];
+function saveSong(){
+  const ref=db.ref(`rooms/${user.room}/songs`).push({
+    title:val("t"),content:val("c")
+  });
 
-  if (!title) return alert("Falta título");
-
-  const ref = db.ref(`rooms/${room}/songs`).push();
-  ref.set({ title, content });
-
-  if (file) {
-    storage.ref(`rooms/${room}/${ref.key}/${file.name}`)
-      .put(file)
-      .then(snap => snap.ref.getDownloadURL())
-      .then(url => ref.update({ file:url }));
+  const f=document.getElementById("file").files[0];
+  if(f){
+    storage.ref(`${user.room}/${ref.key}/${f.name}`).put(f);
   }
-
   leader();
 }
 
-function loadSongs() {
-  const list = document.getElementById("list");
-  db.ref(`rooms/${room}/songs`).on("value", snap => {
-    list.innerHTML = "";
-    snap.forEach(c => {
-      const s = c.val();
-      list.innerHTML += `
-        <div class="item">
-          <b>${s.title}</b>
-          <button onclick="edit('${c.key}')">✏️ Enviar / Editar</button>
-          <button class="delete" onclick="del('${c.key}')">🗑</button>
-        </div>`;
+function loadSongs(){
+  const q=val("search").toLowerCase();
+  db.ref(`rooms/${user.room}/songs`).on("value",snap=>{
+    list().innerHTML="";
+    snap.forEach(c=>{
+      if(!c.val().title.toLowerCase().includes(q)) return;
+      list().innerHTML+=`
+      <div class="song">
+        <b onclick="send('${c.key}')">${c.val().title}</b>
+        <button class="danger" onclick="del('${c.key}')">✖</button>
+      </div>`;
     });
   });
 }
 
-function edit(id) {
-  currentSongId = id;
-  db.ref(`rooms/${room}/songs/${id}`).once("value").then(s => {
-    const d = s.val();
-    db.ref(`rooms/${room}/live`).set(d);
-    app().innerHTML = `
-      <h3>Editando en vivo</h3>
-      <input id="et" value="${d.title}">
-      <textarea id="ec" rows="8">${d.content||""}</textarea>
-      <button class="leader" onclick="saveLive()">Guardar</button>
-      <button onclick="leader()">Volver</button>
-    `;
+function send(id){
+  db.ref(`rooms/${user.room}/songs/${id}`).once("value").then(s=>{
+    db.ref(`rooms/${user.room}/live`).set(s.val());
+    db.ref(`rooms/${user.room}/history`).push(s.val());
   });
 }
 
-function saveLive() {
-  const t = et().value;
-  const c = ec().value;
-  db.ref(`rooms/${room}/songs/${currentSongId}`).update({ title:t, content:c });
-  db.ref(`rooms/${room}/live`).update({ title:t, content:c });
-}
-
-function del(id) {
-  if (confirm("Eliminar alabanza?"))
-    db.ref(`rooms/${room}/songs/${id}`).remove();
+function del(id){
+  if(confirm("Eliminar?"))
+    db.ref(`rooms/${user.room}/songs/${id}`).remove();
 }
 
 /* ---------- MÚSICO ---------- */
-function musician() {
-  app().innerHTML = `
-    <h2 id="mt">Esperando…</h2>
-    <div class="song" id="mc"></div>
-    <div id="mf"></div>
-  `;
-
-  db.ref(`rooms/${room}/live`).on("value", s => {
-    if (!s.exists()) return;
-    const d = s.val();
-    mt().innerText = d.title;
-    mc().innerText = d.content || "";
-    mf().innerHTML = d.file ? `<a href="${d.file}" target="_blank">📄 Ver partitura</a>` : "";
+function musician(){
+  app().innerHTML=`
+  <h2 id="t">Esperando…</h2>
+  <pre id="c"></pre>
+  <button class="small" onclick="logout()">Salir</button>`;
+  db.ref(`rooms/${user.room}/live`).on("value",s=>{
+    if(!s.exists()) return;
+    t().innerText=s.val().title;
+    c().innerHTML=renderChords(s.val().content);
   });
 }
 
-/* helpers */
-const app=()=>document.getElementById("app");
-const nameEl=()=>document.getElementById("name");
-const roomEl=()=>document.getElementById("room");
-const roleEl=()=>document.getElementById("role");
-const titleEl=()=>document.getElementById("title");
-const contentEl=()=>document.getElementById("content");
-const et=()=>document.getElementById("et");
-const ec=()=>document.getElementById("ec");
-const mt=()=>document.getElementById("mt");
-const mc=()=>document.getElementById("mc");
-const mf=()=>document.getElementById("mf");
-</script>
+/* ---------- ACORDES ---------- */
+function renderChords(text){
+  return text.replace(/\[(.*?)\]/g,'<span class="chord">$1</span>');
+}
 
+/* ---------- UTILS ---------- */
+const app=()=>document.getElementById("app");
+const val=id=>document.getElementById(id)?.value||"";
+const list=()=>document.getElementById("list");
+const t=()=>document.getElementById("t");
+const c=()=>document.getElementById("c");
+function logout(){localStorage.clear();location.reload();}
+</script>
 </body>
 </html>
