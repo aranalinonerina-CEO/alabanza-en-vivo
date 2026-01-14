@@ -54,7 +54,14 @@ button {
 }
 .leader { background: #22c55e; color: #000; }
 .musician { background: #3b82f6; color: #fff; }
-.song { white-space: pre-wrap; margin-top: 16px; }
+.song { white-space: pre-wrap; margin-top: 16px; text-align: left; }
+.item {
+  background: #222;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+}
 </style>
 </head>
 
@@ -67,58 +74,106 @@ button {
 </div>
 
 <script>
+// ---------- LÍDER ----------
 function leader() {
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
     <button class="leader" onclick="add()">➕ Nueva alabanza</button>
-    <div id="list"></div>
+    <div id="list">Cargando...</div>
   `;
-  load();
+  loadSongs();
 }
 
 function add() {
   document.getElementById("app").innerHTML = `
     <h2>Nueva alabanza</h2>
-    <input id="title" placeholder="Título" style="width:100%;padding:10px"><br><br>
-    <textarea id="content" rows="8" placeholder="Letra + acordes"
+    <input id="title" placeholder="Título"
+      style="width:100%;padding:10px"><br><br>
+    <textarea id="content" rows="8"
+      placeholder="Letra + acordes"
       style="width:100%;padding:10px"></textarea>
-    <button class="leader" onclick="save()">Guardar</button>
-    <button onclick="leader()">Volver</button>
+    <button class="leader" onclick="saveSong()">Guardar</button>
+    <button onclick="leader()">⬅ Volver</button>
   `;
 }
 
-function save() {
+function saveSong() {
   const title = document.getElementById("title").value;
   const content = document.getElementById("content").value;
-  if (!title || !content) return alert("Falta completar");
+  if (!title || !content) return alert("Completá todo");
 
   database.ref("songs").push({ title, content });
   leader();
 }
 
-function load() {
+function loadSongs() {
   const list = document.getElementById("list");
-  database.ref("songs").once("value").then(snap => {
+  database.ref("songs").on("value", snap => {
     list.innerHTML = "";
+    if (!snap.exists()) {
+      list.innerHTML = "<p>No hay alabanzas</p>";
+      return;
+    }
     snap.forEach(child => {
-      const s = child.val();
-      const d = document.createElement("div");
-      d.innerHTML = `<b>${s.title}</b>`;
-      d.onclick = () => database.ref("song").set(s);
-      d.style.padding = "10px";
-      d.style.background = "#222";
-      d.style.marginTop = "8px";
-      d.style.borderRadius = "10px";
-      list.appendChild(d);
+      const song = child.val();
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `<b>${song.title}</b>`;
+      div.onclick = () => openEditor(child.key, song);
+      list.appendChild(div);
     });
   });
 }
 
+// ---------- EDITOR EN VIVO ----------
+let currentSongId = null;
+
+function openEditor(id, song) {
+  currentSongId = id;
+
+  database.ref("song").set({
+    id,
+    title: song.title,
+    content: song.content
+  });
+
+  document.getElementById("app").innerHTML = `
+    <h2>Editando en vivo</h2>
+
+    <input id="editTitle"
+      value="${song.title}"
+      style="width:100%;padding:10px"><br><br>
+
+    <textarea id="editContent" rows="10"
+      style="width:100%;padding:10px">${song.content}</textarea>
+
+    <button class="leader" onclick="saveLive()">💾 Guardar cambios</button>
+    <button onclick="leader()">⬅ Volver</button>
+  `;
+}
+
+function saveLive() {
+  const title = document.getElementById("editTitle").value;
+  const content = document.getElementById("editContent").value;
+
+  if (!title || !content) return alert("No puede estar vacío");
+
+  // actualiza canción guardada
+  database.ref("songs/" + currentSongId).update({ title, content });
+
+  // actualiza lo que ve el músico
+  database.ref("song").update({ title, content });
+
+  alert("Cambios enviados en vivo 🎶");
+}
+
+// ---------- MÚSICO ----------
 function musician() {
   document.getElementById("app").innerHTML = `
-    <h2 id="t">Esperando…</h2>
+    <h2 id="t">Esperando alabanza…</h2>
     <div class="song" id="c">---</div>
   `;
+
   database.ref("song").on("value", snap => {
     if (!snap.exists()) return;
     document.getElementById("t").innerText = snap.val().title;
