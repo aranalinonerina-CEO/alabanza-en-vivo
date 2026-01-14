@@ -3,27 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <title>Alabanza en vivo</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_PROYECTO.firebaseapp.com",
-  databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
-  projectId: "TU_PROYECTO",
-  storageBucket: "TU_PROYECTO.appspot.com",
-  messagingSenderId: "XXXX",
-  appId: "XXXX"
+  apiKey: "AIzaSyAXKadX2tmURGRO3oZJ2iNJVpUoqzD5jSk",
+  authDomain: "alabanza-en-vivo.firebaseapp.com",
+  databaseURL: "https://alabanza-en-vivo-default-rtdb.firebaseio.com",
+  projectId: "alabanza-en-vivo",
+  storageBucket: "alabanza-en-vivo.appspot.com",
+  messagingSenderId: "374349060844",
+  appId: "1:374349060844:web:67860d311a8ced5db7e3c9"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-const storage = firebase.storage();
+
+let leaderCode = null;
 </script>
 
 <style>
@@ -41,158 +41,159 @@ body {
   background: #111;
   padding: 24px;
   border-radius: 18px;
-  max-width: 480px;
   width: 100%;
+  max-width: 420px;
+  text-align: center;
 }
-button,input,textarea {
+button, input, textarea {
   width: 100%;
-  margin-top: 8px;
   padding: 12px;
+  margin-top: 10px;
   border-radius: 12px;
   border: none;
-  font-size: 16px;
 }
-.leader { background:#22c55e;color:#000 }
-.musician { background:#3b82f6;color:#fff }
-.song { white-space:pre-wrap;font-size:18px }
-.chord { color:#22c55e;font-weight:bold }
+button { cursor: pointer; }
+.leader { background: #22c55e; color: #000; }
+.musician { background: #3b82f6; color: #fff; }
+.song { white-space: pre-wrap; margin-top: 12px; background:#222; padding:12px; border-radius:12px; }
 </style>
 </head>
 
 <body>
-
-<div class="box" id="app">
-  <h1>🎶 Alabanza en vivo</h1>
-  <button class="leader" onclick="role('leader')">Soy Líder</button>
-  <button class="musician" onclick="role('musician')">Soy Músico</button>
-</div>
+<div class="box" id="app"></div>
 
 <script>
-let ROOM = null;
+start();
 
-/* ========== ROLES ========= */
-function role(r){
-  r === "leader" ? leaderAuth() : musicianJoin();
+function start() {
+  document.getElementById("app").innerHTML = `
+    <h1>🎶 Alabanza en vivo</h1>
+    <button class="leader" onclick="leaderRegister()">Soy Líder</button>
+    <button class="musician" onclick="musicianLogin()">Soy Músico</button>
+  `;
 }
 
-/* ========== MÚSICO ========= */
-function musicianJoin(){
-  app(`
-    <h2>Músico</h2>
-    <input id="code" placeholder="Código del líder">
-    <button onclick="enter()">Entrar</button>
-  `);
+/* ===== LÍDER ===== */
+
+function leaderRegister() {
+  document.getElementById("app").innerHTML = `
+    <h2>Crear cuenta líder</h2>
+    <input id="lname" placeholder="Nombre del líder">
+    <button class="leader" onclick="createLeader()">Crear cuenta</button>
+    <button onclick="start()">Volver</button>
+  `;
 }
 
-function enter(){
-  const c = code.value.trim();
-  db.ref("rooms/"+c).once("value").then(s=>{
-    if(!s.exists()) return alert("Código inválido");
-    ROOM = c;
-    musicianView();
+function createLeader() {
+  const name = document.getElementById("lname").value;
+  if (!name) return alert("Ingresá un nombre");
+
+  leaderCode = "L" + Math.random().toString(36).substring(2,8).toUpperCase();
+
+  db.ref("leaders/" + leaderCode).set({
+    name,
+    created: Date.now()
   });
-}
 
-/* ========== LÍDER ========= */
-function leaderAuth(){
-  app(`
-    <h2>Líder</h2>
-    <input id="user" placeholder="Usuario">
-    <input id="pass" type="password" placeholder="Contraseña">
-    <button onclick="login()">Entrar</button>
-    <button onclick="register()">Crear cuenta</button>
-  `);
-}
-
-function register(){
-  const u=user.value,p=pass.value;
-  const code=Math.random().toString(36).substr(2,6).toUpperCase();
-  db.ref("leaders/"+u).once("value").then(s=>{
-    if(s.exists()) return alert("Usuario existe");
-    db.ref("leaders/"+u).set({password:p,room:code});
-    db.ref("rooms/"+code).set({owner:u});
-    ROOM=code; leaderPanel();
-  });
-}
-
-function login(){
-  const u=user.value,p=pass.value;
-  db.ref("leaders/"+u).once("value").then(s=>{
-    if(!s.exists()||s.val().password!==p) return alert("Error");
-    ROOM=s.val().room; leaderPanel();
-  });
-}
-
-/* ========== LÍDER PANEL ========= */
-function leaderPanel(){
-  app(`
-    <h2>Líder (Código ${ROOM})</h2>
-    <button onclick="newSong()">➕ Nueva alabanza</button>
-    <input id="search" placeholder="Buscar" oninput="loadSongs()">
-    <div id="list"></div>
-  `);
-  loadSongs();
-}
-
-function newSong(){
-  app(`
-    <h2>Nueva alabanza</h2>
-    <input id="title" placeholder="Título">
-    <textarea id="content" rows="8" placeholder="Letra + acordes (Ej: [C] Santo es)"></textarea>
-    <input type="file" id="file">
-    <button onclick="saveSong()">Guardar</button>
-    <button onclick="leaderPanel()">Volver</button>
-  `);
-}
-
-function saveSong(){
-  const t=title.value,c=content.value,f=file.files[0];
-  const ref=db.ref("rooms/"+ROOM+"/songs").push();
-  ref.set({title:t,content:c,date:Date.now()});
-  if(f){
-    storage.ref("files/"+ref.key).put(f);
-  }
   leaderPanel();
 }
 
-function loadSongs(){
-  const list=document.getElementById("list");
-  if(!list) return;
-  const q=search.value.toLowerCase();
-  db.ref("rooms/"+ROOM+"/songs").on("value",s=>{
-    list.innerHTML="";
-    s.forEach(c=>{
-      const v=c.val();
-      if(!v.title.toLowerCase().includes(q)) return;
-      const d=document.createElement("div");
-      d.innerHTML=`<b>${v.title}</b>`;
-      d.onclick=()=>db.ref("rooms/"+ROOM+"/live").set(v);
-      d.style.padding="10px";d.style.background="#222";
-      d.style.marginTop="6px";d.style.borderRadius="10px";
+function leaderPanel() {
+  document.getElementById("app").innerHTML = `
+    <h2>Líder</h2>
+    <p><b>Código:</b> ${leaderCode}</p>
+    <button class="leader" onclick="newSong()">➕ Nueva alabanza</button>
+    <input id="search" placeholder="Buscar" oninput="loadSongs()">
+    <div id="list"></div>
+  `;
+  loadSongs();
+}
+
+function newSong() {
+  document.getElementById("app").innerHTML = `
+    <h2>Nueva alabanza</h2>
+    <input id="title" placeholder="Título">
+    <textarea id="content" rows="8" placeholder="Letra + acordes"></textarea>
+    <button class="leader" onclick="saveSong()">Guardar</button>
+    <button onclick="leaderPanel()">Volver</button>
+  `;
+}
+
+function saveSong() {
+  const title = title.value;
+  const content = content.value;
+  if (!title || !content) return alert("Completá todo");
+
+  db.ref("songs/" + leaderCode).push({ title, content });
+  leaderPanel();
+}
+
+function loadSongs() {
+  const list = document.getElementById("list");
+  if (!list) return;
+  const q = document.getElementById("search").value.toLowerCase();
+
+  db.ref("songs/" + leaderCode).on("value", snap => {
+    list.innerHTML = "";
+    snap.forEach(c => {
+      const s = c.val();
+      if (!s.title.toLowerCase().includes(q)) return;
+
+      const d = document.createElement("div");
+      d.className = "song";
+      d.innerHTML = `
+        <b>${s.title}</b><br><br>
+        <button onclick="sendSong('${c.key}')">Enviar</button>
+        <button onclick="deleteSong('${c.key}')">Eliminar</button>
+      `;
       list.appendChild(d);
     });
   });
 }
 
-/* ========== MÚSICO VIEW ========= */
-function musicianView(){
-  app(`
-    <h2 id="t">Esperando…</h2>
-    <div class="song" id="c"></div>
-  `);
-  db.ref("rooms/"+ROOM+"/live").on("value",s=>{
-    if(!s.exists()) return;
-    t.innerText=s.val().title;
-    c.innerHTML=highlight(s.val().content);
+function sendSong(id) {
+  db.ref("songs/" + leaderCode + "/" + id).once("value")
+    .then(s => db.ref("live/" + leaderCode).set(s.val()));
+}
+
+function deleteSong(id) {
+  if (confirm("Eliminar alabanza?")) {
+    db.ref("songs/" + leaderCode + "/" + id).remove();
+  }
+}
+
+/* ===== MÚSICO ===== */
+
+function musicianLogin() {
+  document.getElementById("app").innerHTML = `
+    <h2>Ingresar código</h2>
+    <input id="code" placeholder="Código del líder">
+    <button class="musician" onclick="enterAsMusician()">Entrar</button>
+    <button onclick="start()">Volver</button>
+  `;
+}
+
+function enterAsMusician() {
+  const code = document.getElementById("code").value.toUpperCase();
+  db.ref("leaders/" + code).once("value").then(snap => {
+    if (!snap.exists()) return alert("Código inválido");
+    leaderCode = code;
+    musicianPanel();
   });
 }
 
-/* ========== UTIL ========= */
-function highlight(t){
-  return t.replace(/\[(.*?)\]/g,'<span class="chord">$1</span>');
-}
-function app(html){ document.getElementById("app").innerHTML=html }
-</script>
+function musicianPanel() {
+  document.getElementById("app").innerHTML = `
+    <h2 id="t">Esperando alabanza…</h2>
+    <div id="c" class="song"></div>
+  `;
 
+  db.ref("live/" + leaderCode).on("value", snap => {
+    if (!snap.exists()) return;
+    t.innerText = snap.val().title;
+    c.innerText = snap.val().content;
+  });
+}
+</script>
 </body>
 </html>
