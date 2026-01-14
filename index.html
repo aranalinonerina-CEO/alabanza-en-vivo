@@ -76,8 +76,10 @@
     document.getElementById("app").innerHTML = `
       <h2>Líder</h2>
 
+      <button class="leader" onclick="showAdd()">➕ Agregar alabanza</button>
+
       <input id="search" placeholder="Buscar alabanza"
-        style="width:100%;padding:10px;border-radius:10px;margin-bottom:10px"
+        style="width:100%;padding:10px;border-radius:10px;margin:10px 0"
         oninput="loadSongs()">
 
       <div id="songList">Cargando...</div>
@@ -86,49 +88,38 @@
     loadSongs();
   }
 
-  function loadSongs() {
-    const search = document.getElementById("search")?.value?.toLowerCase() || "";
-
-    database.ref("songs").once("value", snapshot => {
-      const songs = snapshot.val() || {};
-      let html = "";
-
-      Object.keys(songs).forEach(id => {
-        const song = songs[id];
-        if (!song.title.toLowerCase().includes(search)) return;
-
-        html += `
-          <div style="margin-bottom:10px;padding:10px;background:#222;border-radius:10px">
-            <strong>${song.title}</strong>
-            <button class="leader" onclick="sendSong('${id}')">Enviar</button>
-          </div>
-        `;
-      });
-
-      document.getElementById("songList").innerHTML =
-        html || "<p>No hay resultados</p>";
-    });
-  }
-
-  function sendSong(id) {
-    database.ref("songs/" + id).once("value", snapshot => {
-      database.ref("currentSong").set(snapshot.val());
-    });
-  }
-
-  function musician() {
+  function showAdd() {
     document.getElementById("app").innerHTML = `
-      <h2 id="songTitle">Esperando…</h2>
-      <pre class="song" id="songContent">Esperando alabanza…</pre>
+      <h2>Nueva alabanza</h2>
+
+      <input id="newTitle" placeholder="Título"
+        style="width:100%;padding:10px;border-radius:10px;margin-bottom:10px">
+
+      <textarea id="newContent" rows="10"
+        placeholder="Letra + acordes"
+        style="width:100%;padding:10px;border-radius:10px"></textarea>
+
+      <button class="leader" onclick="saveSong()">Guardar</button>
+      <button onclick="leader()">⬅ Volver</button>
     `;
+  }
 
-    database.ref("currentSong").on("value", snapshot => {
-      const data = snapshot.val();
-      if (!data) return;
+  function saveSong() {
+    const title = document.getElementById("newTitle").value;
+    const content = document.getElementById("newContent").value;
 
-      document.getElementById("songTitle").innerText = data.title;
-      document.getElementById("songContent").innerText = data.content;
+    if (!title || !content) {
+      alert("Completá todo");
+      return;
+    }
+
+    database.ref("songs").push({
+      title,
+      content,
+      type: "text"
     });
+
+    leader();
   }
 </script>
 
