@@ -172,7 +172,7 @@
       <pre class="song" id="songContent">Esperando alabanza…</pre>
     `;
 
-    database.ref("song").on("value", (snapshot) => {
+  database.ref("songs").once("value").then((snapshot) => {
       const data = snapshot.val();
       if (!data) return;
 
@@ -190,7 +190,11 @@
 function deleteSong(id) {
   if (!confirm("¿Seguro que querés eliminar esta alabanza?")) return;
 
-  database.ref("songs/" + id).remove();
+  database.ref("songs/" + id).remove().then(() => {
+    loadSongs(); // 🔁 recarga la lista
+  });
+}
+
 }
 
 </script>
