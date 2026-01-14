@@ -1,202 +1,130 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-  <meta charset="UTF-8">
-  <title>Alabanza en vivo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+<meta charset="UTF-8">
+<title>Alabanza en vivo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- 🔥 FIREBASE -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-  <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyAXKadX2tmURGRO3oZJ2iNJVpUoqzD5jSk",
-    authDomain: "alabanza-en-vivo.firebaseapp.com",
-    databaseURL: "https://alabanza-en-vivo-default-rtdb.firebaseio.com",
-    projectId: "alabanza-en-vivo",
-    storageBucket: "alabanza-en-vivo.appspot.com",
-    messagingSenderId: "374349060844",
-    appId: "1:374349060844:web:67860d311a8ced5db7e3c9"
-  };
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAXKadX2tmURGRO3oZJ2iNJVpUoqzD5jSk",
+  authDomain: "alabanza-en-vivo.firebaseapp.com",
+  databaseURL: "https://alabanza-en-vivo-default-rtdb.firebaseio.com",
+  projectId: "alabanza-en-vivo",
+  storageBucket: "alabanza-en-vivo.appspot.com",
+  messagingSenderId: "374349060844",
+  appId: "1:374349060844:web:67860d311a8ced5db7e3c9"
+};
 
-  firebase.initializeApp(firebaseConfig);
-  const database = firebase.database();
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
 </script>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: #000;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-    .box {
-      max-width: 420px;
-      width: 100%;
-      padding: 24px;
-      background: #111;
-      border-radius: 18px;
-      text-align: center;
-    }
-    button {
-      width: 100%;
-      padding: 14px;
-      margin-top: 12px;
-      border: none;
-      border-radius: 14px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    .leader { background: #22c55e; color: #000; }
-    .musician { background: #3b82f6; color: #fff; }
-    .song {
-      margin-top: 20px;
-      font-size: 18px;
-      line-height: 1.5;
-    }
-  </style>
+<style>
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+.box {
+  background: #111;
+  padding: 24px;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+button {
+  width: 100%;
+  padding: 14px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 14px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.leader { background: #22c55e; color: #000; }
+.musician { background: #3b82f6; color: #fff; }
+.song { white-space: pre-wrap; margin-top: 16px; }
+</style>
 </head>
 
 <body>
 
 <div class="box" id="app">
   <h1>🎶 Alabanza en vivo</h1>
-  <p>Elegí tu rol</p>
   <button class="leader" onclick="leader()">Soy Líder</button>
   <button class="musician" onclick="musician()">Soy Músico</button>
 </div>
 
 <script>
-  function leader() {
-    document.getElementById("app").innerHTML = `
-      <h2>Líder</h2>
+function leader() {
+  document.getElementById("app").innerHTML = `
+    <h2>Líder</h2>
+    <button class="leader" onclick="add()">➕ Nueva alabanza</button>
+    <div id="list"></div>
+  `;
+  load();
+}
 
-      <button class="leader" onclick="showAdd()">➕ Agregar alabanza</button>
+function add() {
+  document.getElementById("app").innerHTML = `
+    <h2>Nueva alabanza</h2>
+    <input id="title" placeholder="Título" style="width:100%;padding:10px"><br><br>
+    <textarea id="content" rows="8" placeholder="Letra + acordes"
+      style="width:100%;padding:10px"></textarea>
+    <button class="leader" onclick="save()">Guardar</button>
+    <button onclick="leader()">Volver</button>
+  `;
+}
 
-      <input id="search" placeholder="Buscar alabanza"
-        style="width:100%;padding:10px;border-radius:10px;margin:10px 0"
-        oninput="loadSongs()">
+function save() {
+  const title = document.getElementById("title").value;
+  const content = document.getElementById("content").value;
+  if (!title || !content) return alert("Falta completar");
 
-      <div id="songList">Cargando...</div>
-    `;
+  database.ref("songs").push({ title, content });
+  leader();
+}
 
-    loadSongs();
-  }
-
-  function showAdd() {
-    document.getElementById("app").innerHTML = `
-      <h2>Nueva alabanza</h2>
-
-      <input id="newTitle" placeholder="Título"
-        style="width:100%;padding:10px;border-radius:10px;margin-bottom:10px">
-
-      <textarea id="newContent" rows="10"
-        placeholder="Letra + acordes"
-        style="width:100%;padding:10px;border-radius:10px"></textarea>
-
-      <button class="leader" onclick="saveSong()">Guardar</button>
-      <button onclick="leader()">⬅ Volver</button>
-    `;
-  }
-
-  function saveSong() {
-    const title = document.getElementById("newTitle").value;
-    const content = document.getElementById("newContent").value;
-
-    if (!title || !content) {
-      alert("Completá todo");
-      return;
-    }
-
-    database.ref("songs").push({
-      title,
-      content,
-      type: "text"
+function load() {
+  const list = document.getElementById("list");
+  database.ref("songs").once("value").then(snap => {
+    list.innerHTML = "";
+    snap.forEach(child => {
+      const s = child.val();
+      const d = document.createElement("div");
+      d.innerHTML = `<b>${s.title}</b>`;
+      d.onclick = () => database.ref("song").set(s);
+      d.style.padding = "10px";
+      d.style.background = "#222";
+      d.style.marginTop = "8px";
+      d.style.borderRadius = "10px";
+      list.appendChild(d);
     });
-
-    leader();
-  }
-
-  function loadSongs() {
-    const list = document.getElementById("songList");
-    if (!list) return;
-
-    const search =
-      document.getElementById("search")?.value?.toLowerCase() || "";
-
-    database.ref("songs").on("value", (snapshot) => {
-      list.innerHTML = "";
-
-      if (!snapshot.exists()) {
-        list.innerHTML = "<p>No hay alabanzas guardadas</p>";
-        return;
-      }
-
-    snapshot.forEach((child) => {
-  const song = child.val();
-  const songId = child.key;
-
-        if (!song.title.toLowerCase().includes(search)) return;
-
-        const div = document.createElement("div");
-        div.style.padding = "10px";
-        div.style.margin = "8px 0";
-        div.style.background = "#222";
-        div.style.borderRadius = "10px";
-        div.style.cursor = "pointer";
-
-       div.innerHTML = `
-  <strong>${song.title}</strong><br>
-  <button style="margin-top:6px" onclick="sendSong('${songId}')">
-    📤 Enviar
-  </button>
-  <button style="margin-top:6px;background:#ef4444;color:#fff"
-    onclick="deleteSong('${songId}')">
-    🗑️ Eliminar
-  </button>
-`;
-
-        list.appendChild(div);
-      });
-    });
-  }
-
-  function musician() {
-    document.getElementById("app").innerHTML = `
-      <h2 id="songTitle">Esperando…</h2>
-      <pre class="song" id="songContent">Esperando alabanza…</pre>
-    `;
-
-  database.ref("songs").once("value").then((snapshot) => {
-      const data = snapshot.val();
-      if (!data) return;
-
-      document.getElementById("songTitle").innerText = data.title;
-      document.getElementById("songContent").innerText = data.content;
-    });
-  }
-  function sendSong(id) {
-  database.ref("songs/" + id).once("value").then((snapshot) => {
-    database.ref("song").set(snapshot.val());
-    alert("Alabanza enviada a músicos");
   });
 }
 
-function deleteSong(id) {
-  if (!confirm("¿Seguro que querés eliminar esta alabanza?")) return;
-
-  database.ref("songs/" + id).remove().then(() => {
-    loadSongs(); // 🔁 recarga la lista
+function musician() {
+  document.getElementById("app").innerHTML = `
+    <h2 id="t">Esperando…</h2>
+    <div class="song" id="c">---</div>
+  `;
+  database.ref("song").on("value", snap => {
+    if (!snap.exists()) return;
+    document.getElementById("t").innerText = snap.val().title;
+    document.getElementById("c").innerText = snap.val().content;
   });
 }
-
-}
-
 </script>
 
 </body>
