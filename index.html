@@ -3,203 +3,195 @@
 <head>
 <meta charset="UTF-8">
 <title>Alabanza en vivo</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
 const firebaseConfig = {
-  apiKey: "AIzaSyAXKadX2tmURGRO3oZJ2iNJVpUoqzD5jSk",
-  authDomain: "alabanza-en-vivo.firebaseapp.com",
-  databaseURL: "https://alabanza-en-vivo-default-rtdb.firebaseio.com",
-  projectId: "alabanza-en-vivo",
-  storageBucket: "alabanza-en-vivo.appspot.com",
-  messagingSenderId: "374349060844",
-  appId: "1:374349060844:web:67860d311a8ced5db7e3c9"
+  apiKey: "TU_API_KEY",
+  authDomain: "TU_PROYECTO.firebaseapp.com",
+  databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
+  projectId: "TU_PROYECTO",
+  storageBucket: "TU_PROYECTO.appspot.com",
+  messagingSenderId: "XXXX",
+  appId: "XXXX"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+const storage = firebase.storage();
 </script>
 
 <style>
 body {
-  margin:0;
-  background:#000;
-  color:#fff;
-  font-family:system-ui, sans-serif;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  min-height:100vh;
+  margin: 0;
+  background: #000;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
 }
 .box {
-  background:#111;
-  padding:24px;
-  border-radius:16px;
-  width:100%;
-  max-width:420px;
+  background: #111;
+  padding: 24px;
+  border-radius: 18px;
+  max-width: 480px;
+  width: 100%;
 }
-input, textarea, button {
-  width:100%;
-  padding:12px;
-  margin-top:8px;
-  border-radius:10px;
-  border:none;
+button,input,textarea {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  font-size: 16px;
 }
-button { cursor:pointer; }
-.primary { background:#22c55e; color:#000; }
-.secondary { background:#3b82f6; color:#fff; }
-.song {
-  background:#222;
-  padding:10px;
-  border-radius:10px;
-  margin-top:8px;
-}
-.chord { color:#22c55e; font-weight:bold; }
-pre { white-space:pre-wrap; }
+.leader { background:#22c55e;color:#000 }
+.musician { background:#3b82f6;color:#fff }
+.song { white-space:pre-wrap;font-size:18px }
+.chord { color:#22c55e;font-weight:bold }
 </style>
 </head>
 
 <body>
 
-<div class="box" id="app"></div>
+<div class="box" id="app">
+  <h1>🎶 Alabanza en vivo</h1>
+  <button class="leader" onclick="role('leader')">Soy Líder</button>
+  <button class="musician" onclick="role('musician')">Soy Músico</button>
+</div>
 
 <script>
-/* ========= UTILIDADES ========= */
-function app(){ return document.getElementById("app"); }
-function v(id){ return document.getElementById(id)?.value || ""; }
+let ROOM = null;
 
-/* ========= INICIO ========= */
-start();
-
-function start(){
-  app().innerHTML = `
-    <h2>🎶 Alabanza en vivo</h2>
-    <button class="primary" onclick="login()">Entrar</button>
-    <button class="secondary" onclick="register()">Registrarse</button>
-  `;
+/* ========== ROLES ========= */
+function role(r){
+  r === "leader" ? leaderAuth() : musicianJoin();
 }
 
-/* ========= LOGIN ========= */
-function login(){
-  app().innerHTML = `
-    <h3>Entrar</h3>
+/* ========== MÚSICO ========= */
+function musicianJoin(){
+  app(`
+    <h2>Músico</h2>
+    <input id="code" placeholder="Código del líder">
+    <button onclick="enter()">Entrar</button>
+  `);
+}
+
+function enter(){
+  const c = code.value.trim();
+  db.ref("rooms/"+c).once("value").then(s=>{
+    if(!s.exists()) return alert("Código inválido");
+    ROOM = c;
+    musicianView();
+  });
+}
+
+/* ========== LÍDER ========= */
+function leaderAuth(){
+  app(`
+    <h2>Líder</h2>
     <input id="user" placeholder="Usuario">
-    <input id="code" placeholder="Código del líder">
-    <button class="primary" onclick="doLogin()">Entrar</button>
-    <button onclick="start()">Volver</button>
-  `;
+    <input id="pass" type="password" placeholder="Contraseña">
+    <button onclick="login()">Entrar</button>
+    <button onclick="register()">Crear cuenta</button>
+  `);
 }
 
-function doLogin(){
-  const u = v("user");
-  const c = v("code");
-  if(!u || !c) return alert("Faltan datos");
-
-  db.ref("users/"+u).once("value").then(s=>{
-    if(!s.exists()) return alert("Usuario no existe");
-    const data = s.val();
-    if(data.room !== c) return alert("Código incorrecto");
-
-    localStorage.setItem("user", JSON.stringify(data));
-    data.role === "leader" ? leader(data) : musician(data);
-  });
-}
-
-/* ========= REGISTRO ========= */
 function register(){
-  app().innerHTML = `
-    <h3>Registro</h3>
-    <input id="user" placeholder="Usuario único">
-    <select id="role">
-      <option value="leader">Líder</option>
-      <option value="musician">Músico</option>
-    </select>
-    <input id="code" placeholder="Código del líder">
-    <button class="secondary" onclick="doRegister()">Crear cuenta</button>
-    <button onclick="start()">Volver</button>
-  `;
-}
-
-function doRegister(){
-  const u=v("user"), r=v("role"), c=v("code");
-  if(!u || !c) return alert("Faltan datos");
-
-  db.ref("users/"+u).once("value").then(s=>{
-    if(s.exists()) return alert("Usuario ya existe");
-
-    const data = { username:u, role:r, room:c };
-    if(r==="leader") db.ref("rooms/"+c).set({ owner:u });
-
-    db.ref("users/"+u).set(data);
-    localStorage.setItem("user", JSON.stringify(data));
-    r==="leader"?leader(data):musician(data);
+  const u=user.value,p=pass.value;
+  const code=Math.random().toString(36).substr(2,6).toUpperCase();
+  db.ref("leaders/"+u).once("value").then(s=>{
+    if(s.exists()) return alert("Usuario existe");
+    db.ref("leaders/"+u).set({password:p,room:code});
+    db.ref("rooms/"+code).set({owner:u});
+    ROOM=code; leaderPanel();
   });
 }
 
-/* ========= LÍDER ========= */
-function leader(user){
-  app().innerHTML = `
-    <h3>Líder (${user.room})</h3>
-    <button class="primary" onclick="newSong('${user.room}')">➕ Nueva alabanza</button>
+function login(){
+  const u=user.value,p=pass.value;
+  db.ref("leaders/"+u).once("value").then(s=>{
+    if(!s.exists()||s.val().password!==p) return alert("Error");
+    ROOM=s.val().room; leaderPanel();
+  });
+}
+
+/* ========== LÍDER PANEL ========= */
+function leaderPanel(){
+  app(`
+    <h2>Líder (Código ${ROOM})</h2>
+    <button onclick="newSong()">➕ Nueva alabanza</button>
+    <input id="search" placeholder="Buscar" oninput="loadSongs()">
     <div id="list"></div>
-  `;
-  loadSongs(user.room);
+  `);
+  loadSongs();
 }
 
-function newSong(room){
-  app().innerHTML = `
-    <h3>Nueva alabanza</h3>
+function newSong(){
+  app(`
+    <h2>Nueva alabanza</h2>
     <input id="title" placeholder="Título">
-    <textarea id="content" rows="6" placeholder="Letra + acordes [C]"></textarea>
-    <button class="primary" onclick="saveSong('${room}')">Guardar</button>
-    <button onclick="leader({room:'${room}',role:'leader'})">Volver</button>
-  `;
+    <textarea id="content" rows="8" placeholder="Letra + acordes (Ej: [C] Santo es)"></textarea>
+    <input type="file" id="file">
+    <button onclick="saveSong()">Guardar</button>
+    <button onclick="leaderPanel()">Volver</button>
+  `);
 }
 
-function saveSong(room){
-  db.ref("rooms/"+room+"/songs").push({
-    title:v("title"),
-    content:v("content")
-  });
-  leader({room,role:"leader"});
+function saveSong(){
+  const t=title.value,c=content.value,f=file.files[0];
+  const ref=db.ref("rooms/"+ROOM+"/songs").push();
+  ref.set({title:t,content:c,date:Date.now()});
+  if(f){
+    storage.ref("files/"+ref.key).put(f);
+  }
+  leaderPanel();
 }
 
-function loadSongs(room){
+function loadSongs(){
   const list=document.getElementById("list");
-  db.ref("rooms/"+room+"/songs").on("value",snap=>{
+  if(!list) return;
+  const q=search.value.toLowerCase();
+  db.ref("rooms/"+ROOM+"/songs").on("value",s=>{
     list.innerHTML="";
-    snap.forEach(c=>{
-      list.innerHTML+=`
-        <div class="song" onclick="sendSong('${room}','${c.key}')">
-          ${c.val().title}
-        </div>`;
+    s.forEach(c=>{
+      const v=c.val();
+      if(!v.title.toLowerCase().includes(q)) return;
+      const d=document.createElement("div");
+      d.innerHTML=`<b>${v.title}</b>`;
+      d.onclick=()=>db.ref("rooms/"+ROOM+"/live").set(v);
+      d.style.padding="10px";d.style.background="#222";
+      d.style.marginTop="6px";d.style.borderRadius="10px";
+      list.appendChild(d);
     });
   });
 }
 
-function sendSong(room,id){
-  db.ref("rooms/"+room+"/songs/"+id).once("value").then(s=>{
-    db.ref("rooms/"+room+"/live").set(s.val());
+/* ========== MÚSICO VIEW ========= */
+function musicianView(){
+  app(`
+    <h2 id="t">Esperando…</h2>
+    <div class="song" id="c"></div>
+  `);
+  db.ref("rooms/"+ROOM+"/live").on("value",s=>{
+    if(!s.exists()) return;
+    t.innerText=s.val().title;
+    c.innerHTML=highlight(s.val().content);
   });
 }
 
-/* ========= MÚSICO ========= */
-function musician(user){
-  app().innerHTML = `
-    <h3 id="t">Esperando…</h3>
-    <pre id="c">---</pre>
-  `;
-  db.ref("rooms/"+user.room+"/live").on("value",s=>{
-    if(!s.exists()) return;
-    document.getElementById("t").innerText=s.val().title;
-    document.getElementById("c").innerHTML =
-      s.val().content.replace(/\[(.*?)\]/g,'<span class="chord">$1</span>');
-  });
+/* ========== UTIL ========= */
+function highlight(t){
+  return t.replace(/\[(.*?)\]/g,'<span class="chord">$1</span>');
 }
+function app(html){ document.getElementById("app").innerHTML=html }
 </script>
 
 </body>
