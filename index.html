@@ -132,9 +132,23 @@ function newSong() {
   currentSongId = null;
   document.getElementById("app").innerHTML = `
     <h2>Nueva alabanza</h2>
-    <input id="title" placeholder="Título" style="width:100%;padding:10px"><br><br>
-    <textarea id="content" rows="10" placeholder="Letra + acordes"
+
+    <input id="title" placeholder="Título"
+      style="width:100%;padding:10px"><br><br>
+
+    <textarea id="content" rows="8"
+      placeholder="Letra + acordes"
       style="width:100%;padding:10px"></textarea>
+
+    <br><br>
+
+    <input type="file" id="file"
+      accept=".pdf,.doc,.docx,image/*">
+
+    <p style="font-size:12px;color:#aaa">
+      PDF, Word o imágenes de partituras
+    </p>
+
     <button class="leader" onclick="saveSong()">Guardar</button>
     <button onclick="openLeaderPanel()">Volver</button>
   `;
@@ -143,37 +157,39 @@ function newSong() {
 function saveSong() {
   const title = document.getElementById("title").value;
   const content = document.getElementById("content").value;
-  if (!title || !content) return alert("Completá todo");
+  const file = document.getElementById("file")?.files[0];
 
-  const ref = currentSongId
+  if (!title || !content) {
+    alert("Completá título y letra");
+    return;
+  }
+
+  const songRef = currentSongId
     ? db.ref(`songs/${leaderCode}/${currentSongId}`)
     : db.ref(`songs/${leaderCode}`).push();
 
-  ref.set({ title, content });
-  openLeaderPanel();
-}
+  const songId = songRef.key;
 
-function loadSongs() {
-  const list = document.getElementById("list");
-  db.ref(`songs/${leaderCode}`).on("value", snap => {
-    list.innerHTML = "";
-    if (!snap.exists()) {
-      list.innerHTML = "<p>No hay alabanzas</p>";
-      return;
-    }
-    snap.forEach(child => {
-      const s = child.val();
-      const id = child.key;
-      list.innerHTML += `
-        <div class="card">
-          <b>${s.title}</b><br>
-          <button onclick="sendSong('${id}')">📤 Enviar</button>
-          <button onclick="editSong('${id}')">✏️ Editar</button>
-          <button onclick="deleteSong('${id}')">🗑️ Eliminar</button>
-        </div>
-      `;
+  if (file) {
+    const storageRef = storage.ref(
+      `files/${leaderCode}/${songId}/${file.name}`
+    );
+
+    storageRef.put(file).then(snapshot => {
+      snapshot.ref.getDownloadURL().then(url => {
+        songRef.set({
+          title,
+          content,
+          fileUrl: url,
+          fileName: file.name
+        });
+        openLeaderPanel();
+      });
     });
-  });
+  } else {
+    songRef.set({ title, content });
+    openLeaderPanel();
+  }
 }
 
 function editSong(id) {
