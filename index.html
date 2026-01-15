@@ -154,12 +154,19 @@ function newSong() {
 }
 
 function saveSong() {
-  const title = document.getElementById("title").value;
-  const content = document.getElementById("content").value;
-  const file = document.getElementById("file").files[0];
+  const title = document.getElementById("title").value.trim();
+  const content = document.getElementById("content")?.value || "";
+  const file = document.getElementById("file")?.files[0];
 
-  if (!title) return alert("El título es obligatorio");
-  if (!content && !file) return alert("Escribí letra o subí un archivo");
+  if (!title) {
+    alert("El título es obligatorio");
+    return;
+  }
+
+  if (!content && !file) {
+    alert("Debés escribir la letra o subir un archivo");
+    return;
+  }
 
   const songRef = currentSongId
     ? db.ref(`songs/${leaderCode}/${currentSongId}`)
@@ -168,24 +175,32 @@ function saveSong() {
   const songId = songRef.key;
 
   if (file) {
-    const ref = storage.ref(`files/${leaderCode}/${songId}/${file.name}`);
-    ref.put(file).then(snap =>
-      snap.ref.getDownloadURL().then(url => {
+    const storageRef = storage.ref(
+      `files/${leaderCode}/${songId}/${file.name}`
+    );
+
+    storageRef.put(file).then(snapshot => {
+      snapshot.ref.getDownloadURL().then(url => {
         songRef.set({
           title,
           content,
           fileUrl: url,
           fileName: file.name
+        }).then(() => {
+          openLeaderPanel();
         });
-        openLeaderPanel();
-      })
-    );
+      });
+    });
   } else {
-    songRef.set({ title, content });
-    openLeaderPanel();
+    songRef.set({
+      title,
+      content
+    }).then(() => {
+      openLeaderPanel();
+    });
   }
 }
-  
+
 function editSong(id) {
   db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
     const s = snap.val();
