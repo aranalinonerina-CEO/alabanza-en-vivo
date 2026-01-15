@@ -31,41 +31,42 @@ let currentSongId = null;
 
 <style>
 body {
-  margin: 0;
-  background: #000;
-  color: #fff;
-  font-family: system-ui, sans-serif;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:system-ui,sans-serif;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  min-height:100vh;
 }
 .box {
-  background: #111;
-  padding: 24px;
-  border-radius: 18px;
-  width: 100%;
-  max-width: 420px;
-  text-align: center;
+  background:#111;
+  padding:24px;
+  border-radius:18px;
+  width:100%;
+  max-width:420px;
+  text-align:center;
 }
 button {
-  width: 100%;
-  padding: 14px;
-  margin-top: 10px;
-  border: none;
-  border-radius: 14px;
-  font-size: 16px;
-  cursor: pointer;
+  width:100%;
+  padding:14px;
+  margin-top:10px;
+  border:none;
+  border-radius:14px;
+  font-size:16px;
+  cursor:pointer;
 }
-.leader { background: #22c55e; color: #000; }
-.musician { background: #3b82f6; color: #fff; }
-.song { white-space: pre-wrap; margin-top: 16px; text-align:left; }
+.leader { background:#22c55e; color:#000; }
+.musician { background:#3b82f6; color:#fff; }
+.song { white-space:pre-wrap; margin-top:16px; text-align:left; }
 .card {
   background:#222;
   padding:10px;
   border-radius:10px;
   margin-top:8px;
 }
+a { color:#60a5fa; }
 </style>
 </head>
 
@@ -78,27 +79,28 @@ button {
 </div>
 
 <script>
-/* ---------- LÍDER ---------- */
+/* ================= LÍDER ================= */
 
 function leader() {
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
-    <button class="leader" onclick="showLoginLeader()">🔐 Entrar a mi cuenta</button>
-    <button onclick="createLeader()">🆕 Crear cuenta nueva</button>
+    <button class="leader" onclick="loginLeader()">🔐 Entrar con código</button>
+    <button onclick="createLeader()">🆕 Crear cuenta</button>
     <button onclick="location.reload()">⬅ Volver</button>
   `;
 }
 
-function showLoginLeader() {
+function loginLeader() {
   document.getElementById("app").innerHTML = `
     <h2>Entrar</h2>
-    <input id="code" placeholder="Código de líder" style="width:100%;padding:10px"><br><br>
-    <button class="leader" onclick="loginLeader()">Entrar</button>
-    <button onclick="leader()">⬅ Volver</button>
+    <input id="code" placeholder="Código de líder"
+      style="width:100%;padding:10px"><br><br>
+    <button class="leader" onclick="doLoginLeader()">Entrar</button>
+    <button onclick="leader()">Volver</button>
   `;
 }
 
-function loginLeader() {
+function doLoginLeader() {
   const code = document.getElementById("code").value.toUpperCase();
   if (!code) return alert("Ingresá el código");
 
@@ -110,8 +112,7 @@ function loginLeader() {
 }
 
 function createLeader() {
-  leaderCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-
+  leaderCode = Math.random().toString(36).substring(2,8).toUpperCase();
   db.ref("leaders/" + leaderCode).set({ created: Date.now() });
   alert("Tu código es: " + leaderCode);
   openLeaderPanel();
@@ -136,17 +137,15 @@ function newSong() {
     <input id="title" placeholder="Título"
       style="width:100%;padding:10px"><br><br>
 
-    <textarea id="content" rows="8"
-      placeholder="Letra + acordes"
-      style="width:100%;padding:10px"></textarea>
-
-    <br><br>
+    <textarea id="content" rows="6"
+      placeholder="Letra + acordes (opcional)"
+      style="width:100%;padding:10px"></textarea><br><br>
 
     <input type="file" id="file"
       accept=".pdf,.doc,.docx,image/*">
 
     <p style="font-size:12px;color:#aaa">
-      PDF, Word o imágenes de partituras
+      Podés subir PDF, Word o imagen sin escribir letra
     </p>
 
     <button class="leader" onclick="saveSong()">Guardar</button>
@@ -157,18 +156,11 @@ function newSong() {
 function saveSong() {
   const title = document.getElementById("title").value;
   const content = document.getElementById("content").value;
-  const file = document.getElementById("file")?.files[0];
+  const file = document.getElementById("file").files[0];
 
-  if (!title) {
-  alert("El título es obligatorio");
-  return;
-}
+  if (!title) return alert("El título es obligatorio");
+  if (!content && !file) return alert("Escribí letra o subí un archivo");
 
-if (!content && !file) {
-  alert("Debés escribir la letra o subir un archivo");
-  return;
-}
-  }
   const songRef = currentSongId
     ? db.ref(`songs/${leaderCode}/${currentSongId}`)
     : db.ref(`songs/${leaderCode}`).push();
@@ -176,12 +168,9 @@ if (!content && !file) {
   const songId = songRef.key;
 
   if (file) {
-    const storageRef = storage.ref(
-      `files/${leaderCode}/${songId}/${file.name}`
-    );
-
-    storageRef.put(file).then(snapshot => {
-      snapshot.ref.getDownloadURL().then(url => {
+    const ref = storage.ref(`files/${leaderCode}/${songId}/${file.name}`);
+    ref.put(file).then(snap =>
+      snap.ref.getDownloadURL().then(url => {
         songRef.set({
           title,
           content,
@@ -189,26 +178,32 @@ if (!content && !file) {
           fileName: file.name
         });
         openLeaderPanel();
-      });
-    });
+      })
+    );
   } else {
     songRef.set({ title, content });
     openLeaderPanel();
   }
 }
 
-function editSong(id) {
-  db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
-    const s = snap.val();
-    currentSongId = id;
-    document.getElementById("app").innerHTML = `
-      <h2>Editando</h2>
-      <input id="title" value="${s.title}" style="width:100%;padding:10px"><br><br>
-      <textarea id="content" rows="10"
-        style="width:100%;padding:10px">${s.content}</textarea>
-      <button class="leader" onclick="saveSong()">Guardar</button>
-      <button onclick="openLeaderPanel()">Volver</button>
-    `;
+function loadSongs() {
+  const list = document.getElementById("list");
+  db.ref(`songs/${leaderCode}`).on("value", snap => {
+    list.innerHTML = "";
+    if (!snap.exists()) {
+      list.innerHTML = "<p>No hay alabanzas</p>";
+      return;
+    }
+    snap.forEach(child => {
+      const s = child.val();
+      list.innerHTML += `
+        <div class="card">
+          <b>${s.title}</b><br>
+          <button onclick="sendSong('${child.key}')">📤 Enviar</button>
+          <button onclick="deleteSong('${child.key}')">🗑️ Eliminar</button>
+        </div>
+      `;
+    });
   });
 }
 
@@ -220,11 +215,11 @@ function deleteSong(id) {
 function sendSong(id) {
   db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
     db.ref(`live/${leaderCode}`).set(snap.val());
-    alert("Enviada");
+    alert("Enviada a músicos");
   });
 }
 
-/* ---------- MÚSICO ---------- */
+/* ================= MÚSICO ================= */
 
 function musician() {
   document.getElementById("app").innerHTML = `
@@ -248,13 +243,17 @@ function enterMusician() {
 function listenLive(code) {
   document.getElementById("app").innerHTML = `
     <h2 id="t">Esperando…</h2>
-    <div class="song" id="c">---</div>
+    <div class="song" id="c"></div>
+    <div id="file"></div>
   `;
 
   db.ref(`live/${code}`).on("value", snap => {
     if (!snap.exists()) return;
-    document.getElementById("t").innerText = snap.val().title;
-    document.getElementById("c").innerText = snap.val().content;
+    const s = snap.val();
+    document.getElementById("t").innerText = s.title || "";
+    document.getElementById("c").innerText = s.content || "";
+    document.getElementById("file").innerHTML =
+      s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">📄 Ver archivo</a>` : "";
   });
 }
 </script>
