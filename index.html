@@ -185,6 +185,40 @@ function saveSong() {
     openLeaderPanel();
   }
 }
+  
+function editSong(id) {
+  db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
+    const s = snap.val();
+    currentSongId = id;
+
+    document.getElementById("app").innerHTML = `
+      <h2>Editar alabanza</h2>
+
+      <input id="title" value="${s.title}"
+        style="width:100%;padding:10px"><br><br>
+
+      <textarea id="content" rows="6"
+        style="width:100%;padding:10px"
+        placeholder="Letra + acordes (opcional)"
+      >${s.content || ""}</textarea><br><br>
+
+      <input type="file" id="file"
+        accept=".pdf,.doc,.docx,image/*">
+
+      ${
+        s.fileUrl
+          ? `<p style="font-size:12px">
+               Archivo actual:
+               <a href="${s.fileUrl}" target="_blank">${s.fileName}</a>
+             </p>`
+          : ""
+      }
+
+      <button class="leader" onclick="saveSong()">Guardar cambios</button>
+      <button onclick="openLeaderPanel()">Cancelar</button>
+    `;
+  });
+}
 
 function loadSongs() {
   const list = document.getElementById("list");
@@ -196,13 +230,20 @@ function loadSongs() {
     }
     snap.forEach(child => {
       const s = child.val();
-      list.innerHTML += `
-        <div class="card">
-          <b>${s.title}</b><br>
-          <button onclick="sendSong('${child.key}')">📤 Enviar</button>
-          <button onclick="deleteSong('${child.key}')">🗑️ Eliminar</button>
-        </div>
-      `;
+     list.innerHTML += `
+  <div class="card">
+    <b>${s.title}</b><br>
+
+    <button onclick="sendSong('${child.key}')">📤 Enviar</button>
+
+    <button onclick="editSong('${child.key}')">✏️ Editar</button>
+
+    <button onclick="deleteSong('${child.key}')"
+      style="background:#ef4444;color:white">
+      🗑️ Eliminar
+    </button>
+  </div>
+`;
     });
   });
 }
