@@ -59,12 +59,16 @@ button {
 }
 .leader { background:#22c55e; color:#000; }
 .musician { background:#3b82f6; color:#fff; }
-.song { white-space:pre-wrap; margin-top:16px; text-align:left; }
 .card {
   background:#222;
   padding:10px;
   border-radius:10px;
   margin-top:8px;
+}
+.song {
+  white-space:pre-wrap;
+  text-align:left;
+  margin-top:16px;
 }
 a { color:#60a5fa; }
 </style>
@@ -74,41 +78,33 @@ a { color:#60a5fa; }
 
 <div class="box" id="app">
   <h1>🎶 Alabanza en vivo</h1>
-  <button class="leader" onclick="leader()">Soy Líder</button>
-  <button class="musician" onclick="musician()">Soy Músico</button>
+  <button class="leader" onclick="showLeader()">Soy Líder</button>
+  <button class="musician" onclick="showMusician()">Soy Músico</button>
 </div>
 
 <script>
-/* ================= LÍDER ================= */
+/* ================== PANTALLAS ================== */
 
-function leader() {
+function showLeader() {
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
-    <button class="leader" onclick="showLogin()">🔐 Entrar con código</button>
-    <button onclick="createLeader()">🆕 Crear cuenta</button>
-    <button onclick="location.reload()">⬅ Volver</button>
+    <button class="leader" onclick="loginLeader()">Entrar con código</button>
+    <button onclick="createLeader()">Crear cuenta</button>
+    <button onclick="location.reload()">Volver</button>
   `;
 }
 
-function showLogin() {
+function showMusician() {
   document.getElementById("app").innerHTML = `
-    <h2>Entrar</h2>
-    <input id="code" placeholder="Código de líder" style="width:100%;padding:10px"><br><br>
-    <button class="leader" onclick="loginLeader()">Entrar</button>
-    <button onclick="leader()">Volver</button>
+    <h2>Músico</h2>
+    <input id="code" placeholder="Código del líder"
+      style="width:100%;padding:10px"><br><br>
+    <button class="musician" onclick="enterMusician()">Entrar</button>
+    <button onclick="location.reload()">Volver</button>
   `;
 }
 
-function loginLeader() {
-  const code = document.getElementById("code").value.toUpperCase();
-  if (!code) return alert("Ingresá el código");
-
-  db.ref("leaders/" + code).once("value").then(snap => {
-    if (!snap.exists()) return alert("Código inválido");
-    leaderCode = code;
-    openLeaderPanel();
-  });
-}
+/* ================== LÍDER ================== */
 
 function createLeader() {
   leaderCode = Math.random().toString(36).substring(2,8).toUpperCase();
@@ -117,50 +113,41 @@ function createLeader() {
   openLeaderPanel();
 }
 
+function loginLeader() {
+  const code = prompt("Ingresá tu código").toUpperCase();
+  if (!code) return;
+  db.ref("leaders/" + code).once("value").then(snap => {
+    if (!snap.exists()) return alert("Código inválido");
+    leaderCode = code;
+    openLeaderPanel();
+  });
+}
+
 function openLeaderPanel() {
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
     <p>Código: <b>${leaderCode}</b></p>
-    <button class="leader" onclick="newSong()">➕ Nueva alabanza</button>
+    <button class="leader" onclick="newSong()">Nueva alabanza</button>
     <div id="list"></div>
-    <button onclick="leader()">Cerrar sesión</button>
+    <button onclick="location.reload()">Cerrar sesión</button>
   `;
   loadSongs();
-}
-
-function loadSongs() {
-  const list = document.getElementById("list");
-  db.ref(`songs/${leaderCode}`).on("value", snap => {
-    list.innerHTML = "";
-    if (!snap.exists()) {
-      list.innerHTML = "<p>No hay alabanzas</p>";
-      return;
-    }
-    snap.forEach(child => {
-      const s = child.val();
-      list.innerHTML += `
-        <div class="card">
-          <b>${s.title}</b><br>
-          <button onclick="sendSong('${child.key}')">📤 Enviar</button>
-          <button onclick="editSong('${child.key}')">✏️ Editar</button>
-          <button onclick="deleteSong('${child.key}')" style="background:#ef4444;color:white">
-            🗑️ Eliminar
-          </button>
-        </div>
-      `;
-    });
-  });
 }
 
 function newSong() {
   currentSongId = null;
   document.getElementById("app").innerHTML = `
     <h2>Nueva alabanza</h2>
-    <input id="title" placeholder="Título" style="width:100%;padding:10px"><br><br>
-    <textarea id="content" rows="6" placeholder="Letra + acordes (opcional)"
+    <input id="title" placeholder="Título"
+      style="width:100%;padding:10px"><br><br>
+
+    <textarea id="content" rows="6"
+      placeholder="Letra / acordes (opcional)"
       style="width:100%;padding:10px"></textarea><br><br>
-    <input type="file" id="file" accept=".pdf,.doc,.docx,image/*">
-    <p style="font-size:12px;color:#aaa">PDF, Word o imágenes</p>
+
+    <input type="file" id="file"
+      accept=".pdf,.doc,.docx,image/*">
+
     <button class="leader" onclick="saveSong()">Guardar</button>
     <button onclick="openLeaderPanel()">Volver</button>
   `;
@@ -172,36 +159,57 @@ function saveSong() {
   const file = document.getElementById("file").files[0];
 
   if (!title) return alert("El título es obligatorio");
-  if (!content && !file) return alert("Escribí la letra o subí un archivo");
+  if (!content && !file) return alert("Escribí letra o subí un archivo");
 
   const ref = currentSongId
     ? db.ref(`songs/${leaderCode}/${currentSongId}`)
     : db.ref(`songs/${leaderCode}`).push();
 
-  const id = ref.key;
+  const songId = ref.key;
 
   if (file) {
-    storage.ref(`files/${leaderCode}/${id}/${file.name}`)
+    storage.ref(`files/${leaderCode}/${songId}/${file.name}`)
       .put(file)
       .then(s => s.ref.getDownloadURL())
-      .then(url => ref.set({ title, content, fileUrl: url, fileName: file.name }))
-      .then(openLeaderPanel);
+      .then(url => {
+        ref.set({ title, content, fileUrl:url, fileName:file.name });
+        openLeaderPanel();
+      });
   } else {
-    ref.set({ title, content }).then(openLeaderPanel);
+    ref.set({ title, content });
+    openLeaderPanel();
   }
 }
 
+function loadSongs() {
+  const list = document.getElementById("list");
+  db.ref(`songs/${leaderCode}`).on("value", snap => {
+    list.innerHTML = "";
+    snap.forEach(c => {
+      const s = c.val();
+      list.innerHTML += `
+        <div class="card">
+          <b>${s.title}</b><br>
+          <button onclick="sendSong('${c.key}')">Enviar</button>
+          <button onclick="editSong('${c.key}')">Editar</button>
+          <button onclick="deleteSong('${c.key}')">Eliminar</button>
+        </div>
+      `;
+    });
+  });
+}
+
 function editSong(id) {
-  currentSongId = id;
   db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
     const s = snap.val();
+    currentSongId = id;
     document.getElementById("app").innerHTML = `
       <h2>Editar</h2>
-      <input id="title" value="${s.title}" style="width:100%;padding:10px"><br><br>
-      <textarea id="content" rows="6" style="width:100%;padding:10px">${s.content || ""}</textarea><br><br>
-      <input type="file" id="file" accept=".pdf,.doc,.docx,image/*">
-      ${s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">📄 Archivo actual</a>` : ""}
-      <button class="leader" onclick="saveSong()">Guardar cambios</button>
+      <input id="title" value="${s.title}"
+        style="width:100%;padding:10px"><br><br>
+      <textarea id="content" rows="6"
+        style="width:100%;padding:10px">${s.content||""}</textarea><br><br>
+      <button class="leader" onclick="saveSong()">Guardar</button>
       <button onclick="openLeaderPanel()">Cancelar</button>
     `;
   });
@@ -219,20 +227,11 @@ function sendSong(id) {
   });
 }
 
-/* ================= MÚSICO ================= */
-
-function musician() {
-  document.getElementById("app").innerHTML = `
-    <h2>Músico</h2>
-    <input id="code" placeholder="Código del líder" style="width:100%;padding:10px"><br><br>
-    <button class="musician" onclick="enterMusician()">Entrar</button>
-  `;
-}
+/* ================== MÚSICO ================== */
 
 function enterMusician() {
   const code = document.getElementById("code").value.toUpperCase();
   if (!code) return;
-
   db.ref("leaders/" + code).once("value").then(snap => {
     if (!snap.exists()) return alert("Código inválido");
     listenLive(code);
@@ -243,16 +242,15 @@ function listenLive(code) {
   document.getElementById("app").innerHTML = `
     <h2 id="t">Esperando…</h2>
     <div class="song" id="c"></div>
-    <div id="file"></div>
+    <div id="f"></div>
   `;
-
   db.ref(`live/${code}`).on("value", snap => {
     if (!snap.exists()) return;
     const s = snap.val();
     document.getElementById("t").innerText = s.title || "";
     document.getElementById("c").innerText = s.content || "";
-    document.getElementById("file").innerHTML =
-      s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">📄 Ver archivo</a>` : "";
+    document.getElementById("f").innerHTML =
+      s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">Ver archivo</a>` : "";
   });
 }
 </script>
