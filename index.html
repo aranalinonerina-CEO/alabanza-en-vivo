@@ -119,6 +119,7 @@ function createLeader() {
 }
 
 function openLeaderPanel() {
+  
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
     <p>Código: <b>${leaderCode}</b></p>
@@ -126,7 +127,25 @@ function openLeaderPanel() {
     <div id="list"></div>
     <button onclick="leader()">Cerrar sesión</button>
   `;
-  loadSongs();
+function loadSongs() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  db.ref(`songs/${leaderCode}`).once("value").then(snap => {
+    snap.forEach(child => {
+      const s = child.val();
+      const id = child.key;
+
+      list.innerHTML += `
+        <div class="card">
+          <b>${s.title}</b><br>
+          <button onclick="sendSong('${id}')">📤 Enviar</button>
+          <button onclick="editSong('${id}')">✏️ Editar</button>
+          <button onclick="deleteSong('${id}')">🗑️ Eliminar</button>
+        </div>
+      `;
+    });
+  });
 }
 
 function newSong() {
@@ -154,9 +173,18 @@ function newSong() {
 }
 
 function saveSong() {
-  const title = document.getElementById("title").value.trim();
-  const content = document.getElementById("content")?.value || "";
-  const file = document.getElementById("file")?.files[0];
+  const titleInput = document.getElementById("title");
+  const contentInput = document.getElementById("content");
+  const fileInput = document.getElementById("file");
+
+  if (!titleInput) {
+    alert("Error interno: no se encontró el título");
+    return;
+  }
+
+  const title = titleInput.value.trim();
+  const content = contentInput ? contentInput.value.trim() : "";
+  const file = fileInput && fileInput.files.length > 0 ? fileInput.files[0] : null;
 
   if (!title) {
     alert("El título es obligatorio");
@@ -175,28 +203,35 @@ function saveSong() {
   const songId = songRef.key;
 
   if (file) {
-    const storageRef = storage.ref(
-      `files/${leaderCode}/${songId}/${file.name}`
-    );
+    const storageRef = storage.ref(`files/${leaderCode}/${songId}/${file.name}`);
 
-    storageRef.put(file).then(snapshot => {
-      snapshot.ref.getDownloadURL().then(url => {
-        songRef.set({
+    storageRef.put(file)
+      .then(snapshot => snapshot.ref.getDownloadURL())
+      .then(url => {
+        return songRef.set({
           title,
           content,
           fileUrl: url,
-          fileName: file.name
-        }).then(() => {
-          openLeaderPanel();
+          fileName: file.name,
+          created: Date.now()
         });
+      })
+      .then(() => {
+        openLeaderPanel();
+      })
+      .catch(err => {
+        alert("Error al guardar: " + err.message);
       });
-    });
+
   } else {
     songRef.set({
       title,
-      content
+      content,
+      created: Date.now()
     }).then(() => {
       openLeaderPanel();
+    }).catch(err => {
+      alert("Error al guardar: " + err.message);
     });
   }
 }
