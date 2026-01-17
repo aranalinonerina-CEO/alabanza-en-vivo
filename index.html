@@ -178,12 +178,23 @@ function newSong() {
 }
 
 function saveSong() {
-  const title = document.getElementById("title").value.trim();
-  const content = document.getElementById("content").value.trim();
-  const file = document.getElementById("file").files[0];
+  const titleInput = document.getElementById("title");
+  const contentInput = document.getElementById("content");
+  const fileInput = document.getElementById("file");
 
-  if (!title) return alert("El título es obligatorio");
-  if (!content && !file) return alert("Escribí letra o subí un archivo");
+  const title = titleInput.value.trim();
+  const content = contentInput ? contentInput.value.trim() : "";
+  const file = fileInput && fileInput.files.length ? fileInput.files[0] : null;
+
+  if (!title) {
+    alert("El título es obligatorio");
+    return;
+  }
+
+  if (!content && !file) {
+    alert("Escribí la letra o subí un archivo");
+    return;
+  }
 
   const ref = currentSongId
     ? db.ref(`songs/${leaderCode}/${currentSongId}`)
@@ -191,18 +202,40 @@ function saveSong() {
 
   const songId = ref.key;
 
-  if (file) {
-    storage.ref(`files/${leaderCode}/${songId}/${file.name}`)
-      .put(file)
-      .then(s => s.ref.getDownloadURL())
-      .then(url => {
-        ref.set({ title, content, fileUrl:url, fileName:file.name });
-        openLeaderPanel();
-      });
-  } else {
-    ref.set({ title, content });
-    openLeaderPanel();
+  // 👉 SOLO LETRA
+  if (!file) {
+    ref.set({
+      title,
+      content,
+      created: Date.now()
+    }).then(() => {
+      openLeaderPanel();
+    }).catch(err => {
+      alert("Error al guardar: " + err.message);
+    });
+    return;
   }
+
+  // 👉 CON ARCHIVO
+  const storageRef = storage.ref(`files/${leaderCode}/${songId}/${file.name}`);
+
+  storageRef.put(file)
+    .then(snapshot => snapshot.ref.getDownloadURL())
+    .then(url => {
+      return ref.set({
+        title,
+        content,
+        fileUrl: url,
+        fileName: file.name,
+        created: Date.now()
+      });
+    })
+    .then(() => {
+      openLeaderPanel();
+    })
+    .catch(err => {
+      alert("Error al subir archivo: " + err.message);
+    });
 }
 
 function loadSongs() {
