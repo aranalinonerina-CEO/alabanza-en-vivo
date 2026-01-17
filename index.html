@@ -203,13 +203,31 @@ function editSong(id) {
   db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
     const s = snap.val();
     currentSongId = id;
+
     document.getElementById("app").innerHTML = `
-      <h2>Editar</h2>
+      <h2>Editar alabanza</h2>
+
       <input id="title" value="${s.title}"
         style="width:100%;padding:10px"><br><br>
+
       <textarea id="content" rows="6"
-        style="width:100%;padding:10px">${s.content||""}</textarea><br><br>
-      <button class="leader" onclick="saveSong()">Guardar</button>
+        style="width:100%;padding:10px"
+        placeholder="Letra / acordes (opcional)"
+      >${s.content || ""}</textarea><br><br>
+
+      <input type="file" id="file"
+        accept=".pdf,.doc,.docx,image/*"><br><br>
+
+      ${
+        s.fileUrl
+          ? `<p style="font-size:12px">
+               Archivo actual:
+               <a href="${s.fileUrl}" target="_blank">${s.fileName}</a>
+             </p>`
+          : ""
+      }
+
+      <button class="leader" onclick="saveSong()">Guardar cambios</button>
       <button onclick="openLeaderPanel()">Cancelar</button>
     `;
   });
