@@ -108,42 +108,32 @@ function showMusician() {
 
 function createLeader() {
   leaderCode = Math.random().toString(36).substring(2,8).toUpperCase();
-  db.ref("leaders/" + leaderCode).set({ created: Date.now() });
-  alert("Tu código es: " + leaderCode);
-  openLeaderPanel();
+
+  db.ref("leaders/" + leaderCode).set({
+    created: Date.now()
+  }).then(() => {
+    localStorage.setItem("leaderCode", leaderCode);
+    alert("Tu código de líder es: " + leaderCode);
+    openLeaderPanel();
+  });
 }
+  
+function loginLeader() {
+  const code = prompt("Ingresá tu código de líder");
 
-function editSong(id) {
-  db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
-    const s = snap.val();
-    currentSongId = id;
+  if (!code) return;
 
-    document.getElementById("app").innerHTML = `
-      <h2>Editar alabanza</h2>
+  const cleanCode = code.trim().toUpperCase();
 
-      <input id="title" value="${s.title}"
-        style="width:100%;padding:10px"><br><br>
+  db.ref("leaders/" + cleanCode).once("value").then(snap => {
+    if (!snap.exists()) {
+      alert("Código inválido");
+      return;
+    }
 
-      <textarea id="content" rows="6"
-        style="width:100%;padding:10px"
-        placeholder="Letra / acordes (opcional)"
-      >${s.content || ""}</textarea><br><br>
-
-      <input type="file" id="file"
-        accept=".pdf,.doc,.docx,image/*"><br><br>
-
-      ${
-        s.fileUrl
-          ? `<p style="font-size:12px">
-               Archivo actual:
-               <a href="${s.fileUrl}" target="_blank">${s.fileName}</a>
-             </p>`
-          : ""
-      }
-
-      <button class="leader" onclick="saveSong()">Guardar cambios</button>
-      <button onclick="openLeaderPanel()">Cancelar</button>
-    `;
+    leaderCode = cleanCode;
+    localStorage.setItem("leaderCode", leaderCode);
+    openLeaderPanel();
   });
 }
 
@@ -326,6 +316,15 @@ function listenLive(code) {
     document.getElementById("c").innerText = s.content || "";
     document.getElementById("f").innerHTML =
       s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">Ver archivo</a>` : "";
+  });
+}
+  const savedLeader = localStorage.getItem("leaderCode");
+if (savedLeader) {
+  db.ref("leaders/" + savedLeader).once("value").then(snap => {
+    if (snap.exists()) {
+      leaderCode = savedLeader;
+      openLeaderPanel();
+    }
   });
 }
 </script>
