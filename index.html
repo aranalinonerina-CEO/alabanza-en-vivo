@@ -86,6 +86,20 @@ a { color:#60a5fa; }
 /* ================== PANTALLAS ================== */
 
 function showLeader() {
+  const savedLeader = localStorage.getItem("leaderCode");
+
+  if (savedLeader) {
+    db.ref("leaders/" + savedLeader).once("value").then(snap => {
+      if (snap.exists()) {
+        if (confirm("¿Querés entrar con tu cuenta guardada?")) {
+          leaderCode = savedLeader;
+          openLeaderPanel();
+          return;
+        }
+      }
+    });
+  }
+
   document.getElementById("app").innerHTML = `
     <h2>Líder</h2>
     <button class="leader" onclick="loginLeader()">Entrar con código</button>
@@ -93,6 +107,7 @@ function showLeader() {
     <button onclick="location.reload()">Volver</button>
   `;
 }
+
 
 function showMusician() {
   document.getElementById("app").innerHTML = `
@@ -318,15 +333,7 @@ function listenLive(code) {
       s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">Ver archivo</a>` : "";
   });
 }
-  const savedLeader = localStorage.getItem("leaderCode");
-if (savedLeader) {
-  db.ref("leaders/" + savedLeader).once("value").then(snap => {
-    if (snap.exists()) {
-      leaderCode = savedLeader;
-      openLeaderPanel();
-    }
-  });
-}
+
 </script>
 
 </body>
