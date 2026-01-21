@@ -182,7 +182,8 @@ function newSong() {
   `;
 }
 
-function saveSong() {
+  <script>
+async function saveSong() {
   const titleInput = document.getElementById("title");
   const contentInput = document.getElementById("content");
   const fileInput = document.getElementById("file");
@@ -201,47 +202,47 @@ function saveSong() {
     return;
   }
 
-  const ref = currentSongId
-    ? db.ref(`songs/${leaderCode}/${currentSongId}`)
-    : db.ref(`songs/${leaderCode}`).push();
+  try {
+    const ref = currentSongId
+      ? db.ref(`songs/${leaderCode}/${currentSongId}`)
+      : db.ref(`songs/${leaderCode}`).push();
 
-  const songId = ref.key;
+    const songId = ref.key;
 
-  // 👉 SOLO LETRA
-  if (!file) {
-    ref.set({
+    let fileData = {};
+
+    // 👉 SI HAY ARCHIVO, SUBIRLO PRIMERO
+    if (file) {
+      const storageRef = storage.ref(
+        `files/${leaderCode}/${songId}/${Date.now()}_${file.name}`
+      );
+
+      const snapshot = await storageRef.put(file);
+      const url = await snapshot.ref.getDownloadURL();
+
+      fileData = {
+        fileUrl: url,
+        fileName: file.name
+      };
+    }
+
+    // 👉 GUARDAR EN REALTIME DATABASE
+    await ref.set({
       title,
       content,
+      ...fileData,
       created: Date.now()
-    }).then(() => {
-      openLeaderPanel();
-    }).catch(err => {
-      alert("Error al guardar: " + err.message);
     });
-    return;
+
+    alert("Alabanza guardada correctamente");
+    openLeaderPanel();
+
+  } catch (err) {
+    console.error(err);
+    alert("Error al guardar: " + err.message);
   }
-
-  // 👉 CON ARCHIVO
-  const storageRef = storage.ref(`files/${leaderCode}/${songId}/${file.name}`);
-
-  storageRef.put(file)
-    .then(snapshot => snapshot.ref.getDownloadURL())
-    .then(url => {
-      return ref.set({
-        title,
-        content,
-        fileUrl: url,
-        fileName: file.name,
-        created: Date.now()
-      });
-    })
-    .then(() => {
-      openLeaderPanel();
-    })
-    .catch(err => {
-      alert("Error al subir archivo: " + err.message);
-    });
 }
+</script>
 
 function loadSongs() {
   const list = document.getElementById("list");
