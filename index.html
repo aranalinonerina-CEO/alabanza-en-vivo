@@ -9,31 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyAXKadX2tmURGRO3oZJ2iNJVpUoqzD5jSk",
-  authDomain: "alabanza-en-vivo.firebaseapp.com",
-  databaseURL: "https://alabanza-en-vivo-default-rtdb.firebaseio.com",
-  projectId: "alabanza-en-vivo",
-  storageBucket: "alabanza-en-vivo.appspot.com",
-  messagingSenderId: "374349060844",
-  appId: "1:374349060844:web:67860d311a8ced5db7e3c9"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const storage = firebase.storage();
-const auth = firebase.auth();
-
-auth.signInAnonymously()
-  .catch(err => {
-    alert("Error de autenticación: " + err.message);
-  });
-
-let leaderCode = null;
-let currentSongId = null;
-</script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
 <style>
 body {
@@ -77,6 +53,11 @@ button {
   margin-top:16px;
 }
 a { color:#60a5fa; }
+input, textarea {
+  border-radius:10px;
+  border:none;
+  outline:none;
+}
 </style>
 </head>
 
@@ -89,6 +70,31 @@ a { color:#60a5fa; }
 </div>
 
 <script>
+/* ================== FIREBASE ================== */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAXKadX2tmURGRO3oZJ2iNJVpUoqzD5jSk",
+  authDomain: "alabanza-en-vivo.firebaseapp.com",
+  databaseURL: "https://alabanza-en-vivo-default-rtdb.firebaseio.com",
+  projectId: "alabanza-en-vivo",
+  storageBucket: "alabanza-en-vivo.appspot.com",
+  messagingSenderId: "374349060844",
+  appId: "1:374349060844:web:67860d311a8ced5db7e3c9"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+const storage = firebase.storage();
+const auth = firebase.auth();
+
+auth.signInAnonymously().catch(err => {
+  alert("Error de autenticación: " + err.message);
+});
+
+let leaderCode = null;
+let currentSongId = null;
+
 /* ================== PANTALLAS ================== */
 
 function showLeader() {
@@ -96,12 +102,9 @@ function showLeader() {
 
   if (savedLeader) {
     db.ref("leaders/" + savedLeader).once("value").then(snap => {
-      if (snap.exists()) {
-        if (confirm("¿Querés entrar con tu cuenta guardada?")) {
-          leaderCode = savedLeader;
-          openLeaderPanel();
-          return;
-        }
+      if (snap.exists() && confirm("¿Entrar con tu cuenta guardada?")) {
+        leaderCode = savedLeader;
+        openLeaderPanel();
       }
     });
   }
@@ -113,7 +116,6 @@ function showLeader() {
     <button onclick="location.reload()">Volver</button>
   `;
 }
-
 
 function showMusician() {
   document.getElementById("app").innerHTML = `
@@ -129,30 +131,20 @@ function showMusician() {
 
 function createLeader() {
   leaderCode = Math.random().toString(36).substring(2,8).toUpperCase();
-
-  db.ref("leaders/" + leaderCode).set({
-    created: Date.now()
-  }).then(() => {
+  db.ref("leaders/" + leaderCode).set({ created: Date.now() }).then(() => {
     localStorage.setItem("leaderCode", leaderCode);
-    alert("Tu código de líder es: " + leaderCode);
+    alert("Tu código es: " + leaderCode);
     openLeaderPanel();
   });
 }
-  
-function loginLeader() {
-  const code = prompt("Ingresá tu código de líder");
 
+function loginLeader() {
+  const code = prompt("Ingresá tu código").toUpperCase();
   if (!code) return;
 
-  const cleanCode = code.trim().toUpperCase();
-
-  db.ref("leaders/" + cleanCode).once("value").then(snap => {
-    if (!snap.exists()) {
-      alert("Código inválido");
-      return;
-    }
-
-    leaderCode = cleanCode;
+  db.ref("leaders/" + code).once("value").then(snap => {
+    if (!snap.exists()) return alert("Código inválido");
+    leaderCode = code;
     localStorage.setItem("leaderCode", leaderCode);
     openLeaderPanel();
   });
@@ -175,79 +167,41 @@ function newSong() {
     <h2>Nueva alabanza</h2>
     <input id="title" placeholder="Título"
       style="width:100%;padding:10px"><br><br>
-
     <textarea id="content" rows="6"
-      placeholder="Letra / acordes (opcional)"
+      placeholder="Letra / acordes"
       style="width:100%;padding:10px"></textarea><br><br>
-
-    <input type="file" id="file"
-      accept=".pdf,.doc,.docx,image/*">
-
+    <input type="file" id="file" accept=".pdf,.doc,.docx,image/*"><br><br>
     <button class="leader" onclick="saveSong()">Guardar</button>
     <button onclick="openLeaderPanel()">Volver</button>
   `;
 }
 
 async function saveSong() {
-  const titleInput = document.getElementById("title");
-  const contentInput = document.getElementById("content");
+  const title = document.getElementById("title").value.trim();
+  const content = document.getElementById("content").value.trim();
   const fileInput = document.getElementById("file");
+  const file = fileInput.files[0];
 
-  const title = titleInput.value.trim();
-  const content = contentInput ? contentInput.value.trim() : "";
-  const file = fileInput && fileInput.files.length ? fileInput.files[0] : null;
+  if (!title) return alert("El título es obligatorio");
+  if (!content && !file) return alert("Agregá letra o archivo");
 
-  if (!title) {
-    alert("El título es obligatorio");
-    return;
+  const ref = currentSongId
+    ? db.ref(`songs/${leaderCode}/${currentSongId}`)
+    : db.ref(`songs/${leaderCode}`).push();
+
+  let fileData = {};
+
+  if (file) {
+    const storageRef = storage.ref(`files/${leaderCode}/${ref.key}/${file.name}`);
+    const snap = await storageRef.put(file);
+    const url = await snap.ref.getDownloadURL();
+    fileData = { fileUrl: url, fileName: file.name };
   }
 
-  if (!content && !file) {
-    alert("Escribí la letra o subí un archivo");
-    return;
-  }
-
-  try {
-    const ref = currentSongId
-      ? db.ref(`songs/${leaderCode}/${currentSongId}`)
-      : db.ref(`songs/${leaderCode}`).push();
-
-    const songId = ref.key;
-
-    let fileData = {};
-
-    // 👉 SI HAY ARCHIVO, SUBIRLO PRIMERO
-    if (file) {
-      const storageRef = storage.ref(
-        `files/${leaderCode}/${songId}/${Date.now()}_${file.name}`
-      );
-
-      const snapshot = await storageRef.put(file);
-      const url = await snapshot.ref.getDownloadURL();
-
-      fileData = {
-        fileUrl: url,
-        fileName: file.name
-      };
-    }
-
-    // 👉 GUARDAR EN REALTIME DATABASE
-    await ref.set({
-      title,
-      content,
-      ...fileData,
-      created: Date.now()
-    });
-
-    alert("Alabanza guardada correctamente");
-    openLeaderPanel();
-
-  } catch (err) {
-    console.error(err);
-    alert("Error al guardar: " + err.message);
-  }
+  await ref.set({ title, content, ...fileData, created: Date.now() });
+  alert("Guardado correctamente");
+  openLeaderPanel();
 }
-</script>
 
 function loadSongs() {
   const list = document.getElementById("list");
@@ -261,8 +215,7 @@ function loadSongs() {
           <button onclick="sendSong('${c.key}')">Enviar</button>
           <button onclick="editSong('${c.key}')">Editar</button>
           <button onclick="deleteSong('${c.key}')">Eliminar</button>
-        </div>
-      `;
+        </div>`;
     });
   });
 }
@@ -271,31 +224,15 @@ function editSong(id) {
   db.ref(`songs/${leaderCode}/${id}`).once("value").then(snap => {
     const s = snap.val();
     currentSongId = id;
-
     document.getElementById("app").innerHTML = `
-      <h2>Editar alabanza</h2>
-
+      <h2>Editar</h2>
       <input id="title" value="${s.title}"
         style="width:100%;padding:10px"><br><br>
-
       <textarea id="content" rows="6"
-        style="width:100%;padding:10px"
-        placeholder="Letra / acordes (opcional)"
-      >${s.content || ""}</textarea><br><br>
-
-      <input type="file" id="file"
-        accept=".pdf,.doc,.docx,image/*"><br><br>
-
-      ${
-        s.fileUrl
-          ? `<p style="font-size:12px">
-               Archivo actual:
-               <a href="${s.fileUrl}" target="_blank">${s.fileName}</a>
-             </p>`
-          : ""
-      }
-
-      <button class="leader" onclick="saveSong()">Guardar cambios</button>
+        style="width:100%;padding:10px">${s.content || ""}</textarea><br><br>
+      <input type="file" id="file"><br><br>
+      ${s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">Archivo actual</a><br><br>` : ""}
+      <button class="leader" onclick="saveSong()">Guardar</button>
       <button onclick="openLeaderPanel()">Cancelar</button>
     `;
   });
@@ -339,7 +276,7 @@ function listenLive(code) {
       s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">Ver archivo</a>` : "";
   });
 }
-
 </script>
+
 </body>
 </html>
